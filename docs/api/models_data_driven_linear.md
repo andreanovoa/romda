@@ -4,7 +4,7 @@
 which makes it useful for Kalman-filter examples and baseline forecasts.
 
 $$
-\boldsymbol{\psi}_{t+1} = \mathbf{F}\boldsymbol{\psi}_t + \boldsymbol{\eta}_t.
+\vect{\psi}_{t+1} = \matr{F}\vect{\psi}_t + \vect{\eta}_t.
 $$
 
 ::: romda.models.data_driven.linear_model.LinearModel

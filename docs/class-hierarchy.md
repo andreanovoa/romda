@@ -18,39 +18,47 @@ All use `IVPIntegrator` (scipy `solve_ivp`) except KS.
 | `KS` | Nx | `nu`, `L`, `Nx` | Discrete (ETDRK4) |
 | `Rijke` | 2Nm+Nc | `beta`, `tau`, `C1`, `C2`, `kappa` | IVP |
 
-#### Data-driven models — `src/models/data_driven/`
+#### Data-driven models — `src/romda/models/data_driven/`
 
-All use `DiscreteIntegrator`. The ML base classes `EchoStateNetwork` (from the external `echostatenetwork` package) and the `Projector` hierarchy (`POD`/`SPOD`, in `src/models/data_driven/autoencoders/` — see [Data-driven models](api/models_data_driven.md)) are mixed in via multiple inheritance.
+All use `DiscreteIntegrator`. The ML base classes `EchoStateNetwork` (from the external `echostatenetwork` package) and the `Projector` hierarchy (`POD`/`SPOD`, in `src/romda/models/data_driven/autoencoders/` — see [Data-driven models](api/models_data_driven.md)) are mixed in via multiple inheritance.
 
 | Class | Key parameters | Notes |
 |---|---|---|
 | `ESN_model` | `N_units`, `rho`, `sigma_in`, `N_wash` | Inherits `EchoStateNetwork`; requires training `data` at init |
-| `POD_ESN` | `N_modes`, `sensor_locations` | Inherits `ESN_model` + `POD`; sensor placement via QR |
-| `LinearModel` | `F` (transition matrix), `Q_noise` | `ψ_{t+1} = F @ ψ_t + noise` |
+| `LatentROM` | `Nq`, `measure_modes`, `qr_selection`, `sensor_locations` | Base of every projector + forecaster ROM: fits the projector, trains the forecaster on the latent trajectory, places sensors by QR on the decoder Jacobian |
+| `POD_ESN` | `N_modes`, `sensor_locations` | `LatentROM` + `ESN_model` + `POD`; sensor placement via QR on `Psi` |
+| `LinearModel` | `F` (transition matrix), `Q_noise` | $\vect{\psi}_{t+1} = \matr{F}\vect{\psi}_t + \vect{\eta}_t$ |
+
+
 
 ---
 
 ## Estimator
 
-**File:** `src/estimators/__init__.py`
+**Package:** `src/romda/estimators/` (the layout of [`biasda`](https://github.com/andreanovoa/biasda), which romda will import once it is released).
 
-Abstract base class (ABC) that wraps a `Model` and an optional `Bias` into a full DA loop. Provides the shared `forecast_step()` that advances both the model and the bias in time.
+romda keeps only the filters that its papers employ: the ensemble Kalman filters (`EnKF`, `EnSRKF`, `rEnKF`) and the linear Kalman filter of the introductory tutorials. The other ensemble updates, the dual scheme, localization, the bias-estimation routes, the extended and unscented Kalman filters, the particle filters and the smoothers live in [`biasda`](https://github.com/andreanovoa/biasda).
 
-**Key attributes:** `est_phi`, `est_alpha`, `est_bias`, `inflation_factor`, `num_DA_blind`, `num_SE_only`
+Abstract base class (ABC) that wraps a `Model` and an optional `Bias` into a full DA loop. `SequentialEstimator` adds the shared `forecast_step()` that advances both the model and the bias in time.
+
+**Key attributes:** `est_alpha`, `inflation_factor`, `regularization_factor`, `inflate_parameters`, `start_param`, `start_bias`
 
 **Key concrete methods:** `forecast_step()`, `_init_bias()`, `_MA()` (applies measurement operator `M`)
 
 Subclasses must implement:
 - `analysis_step(d, Cdd)` — Bayesian update given observation vector `d` and noise covariance `Cdd`
 
+What is estimated (state, state + parameters, state + parameters + bias) is a configuration of the augmented state; how it assimilates is the class:
+
 ```
 Estimator  (ABC)
-├── EnsembleEstimator
-│   ├── EnKF
-│   ├── EnSRKF
-│   └── rBA_EnKF
-└── DeterministicEstimator
-    └── KalmanFilter
+└── SequentialEstimator
+    ├── KalmanFilter            type = linear
+    └── EnsembleFilter          type = stochastic | sqrt
+        ├── EnKF
+        │   └── rEnKF
+        │       └── rBA_EnKF
+        └── EnSRKF
 ```
 
 The relationship between the three main classes — attributes, not subclasses:
@@ -66,32 +74,33 @@ Estimator instance
 
 ### Available estimators
 
-#### Ensemble estimators — `src/estimators/ensembles.py`
+#### Ensemble filters — `src/romda/estimators/sequential/ensemble.py`
 
-`EnsembleEstimator` is the concrete intermediate base; leaf classes only implement `_analysis_kernel(Af, d, Cdd)`.
+`EnsembleEstimator` is the abstract base of the ensemble estimators; `EnsembleFilter` is the ensemble Kalman filter, configured by `type` (`'stochastic'` or `'sqrt'`) and `parameter_estimation` (None or `'joint'`), and the named classes are presets.
 
-**Key attributes:** `m` (ensemble size), `std_phi`, `std_alpha`, `regularization_factor`
+**Key attributes:** `m` (ensemble size), `type`, `parameter_estimation`, `regularization_factor`, `update_reservoir`
 
-| Class | Filter type | Reference |
+| Class | Configuration | Reference |
 |---|---|---|
-| `EnKF` | Stochastic EnKF (perturbed observations) | Evensen (2003) |
-| `EnSRKF` | Deterministic square-root EnKF | Tippett et al. (2003) |
-| `rBA_EnKF` | Regularised bias-aware EnKF, weight `γ` | Nóvoa & Magri (2022) |
+| `EnKF` | `type='stochastic'` (perturbed observations) | Evensen (2003) |
+| `EnSRKF` | `type='sqrt'` (symmetric square root, ETKF) | Tippett et al. (2003) |
+| `rEnKF` (`rBA_EnKF`) | bias-aware, regularized by `bias_regularization` | Nóvoa, Racca & Magri (2023) |
 
-#### Deterministic estimators — `src/estimators/deterministic.py`
+Covariance inflation (`inflation=`, `src/romda/estimators/inflation.py`) is a configuration of every filter.
 
-`DeterministicEstimator` owns the state mean `ψ` and covariance `Cpp` directly (no ensemble).
+#### Kalman filters — `src/romda/estimators/sequential/kalman.py`
+
+`KalmanFilter` owns the state mean `ψ` and covariance `Cpp` directly (no ensemble).
 
 | Class | Notes |
 |---|---|
-| `KalmanFilter` | Standard linear KF; propagates covariance with Jacobian `F_jac` |
-
+| `KalmanFilter` | `type='linear'`; a model or `F` advances the mean, and the Jacobian `F_jac` propagates the covariance |
 
 ---
 
 ## Bias
 
-**File:** `src/bias_estimators/bias.py`
+**File:** `src/romda/bias_estimators/bias.py`
 
 Base class for observation-bias estimators. Mixes in `HistoryTracker`. Wraps a `forecaster` model to produce bias corrections at each assimilation step.
 
@@ -110,8 +119,8 @@ Bias
 
 | Class | File | Notes |
 |---|---|---|
-| `ESN_bias` | `src/bias_estimators/esn.py` | Correlation-based training; `biased_observations = True`; the workhorse |
-| `ConstantBias` | `src/bias_estimators/constantbias.py` | Fixed bias estimate; `NoBias` subclass for bias-blind DA |
+| `ESN_bias` | `src/romda/bias_estimators/esn.py` | Correlation-based training; `biased_observations = True`; the workhorse |
+| `ConstantBias` | `src/romda/bias_estimators/constantbias.py` | Fixed bias estimate; `NoBias` subclass for bias-blind DA |
 
 ---
 
@@ -130,9 +139,9 @@ The forecaster is initialised inside `init_forecaster()` and stepped forward in 
 
 ## Observations
 
-**File:** `src/observations.py`
+**File:** `src/romda/observations.py`
 
-Standalone class (no inheritance). Generates or loads ground-truth data, applies a configurable manual bias, adds noise, and exposes observation time indices for the DA loop.
+Standalone class (no inheritance). Generates or loads the reference solution, applies a configurable manual bias, adds noise, and exposes observation time indices for the DA loop.
 
 **Key attributes:**
 

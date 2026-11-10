@@ -2,7 +2,7 @@
 
 ## Summary
 
-**File:** `src/observations.py`
+**File:** `src/romda/observations.py`
 
 Standalone class (no inheritance). Generates or loads ground-truth data, applies a configurable manual bias, adds noise, and exposes observation time indices for the DA loop.
 

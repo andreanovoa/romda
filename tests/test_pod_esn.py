@@ -4,28 +4,13 @@ These use a small synthetic travelling-wave 'flow' so no external dataset is nee
 """
 import numpy as np
 import pytest
-
+from conftest import synthetic_flow
 from romda.models.data_driven import POD_ESN
-
-
-def synthetic_flow(N_t=260, Nx=24, Ny=12):
-    """Two-field periodic snapshot data (Nu, N_t, Nx, Ny) with a NaN 'body' mask."""
-    t = np.linspace(0, 16 * np.pi, N_t)
-    x = np.linspace(0, 2 * np.pi, Nx)
-    y = np.linspace(0, np.pi, Ny)
-    X, Y = np.meshgrid(x, y, indexing='ij')
-
-    u = (np.sin(X)[None] * np.cos(t)[:, None, None]
-         + 0.5 * np.sin(2 * X + Y)[None] * np.sin(2 * t)[:, None, None])
-    v = np.cos(X + Y)[None] * np.sin(t)[:, None, None]
-    u[:, 2:4, 2:4] = np.nan
-    v[:, 2:4, 2:4] = np.nan
-    return np.array([u, v])
 
 
 @pytest.fixture(scope='module')
 def pod_esn_case():
-    X = synthetic_flow()
+    X = synthetic_flow(N_t=260)
     dt = 0.05
     return POD_ESN(data=X,
                    domain=[0, 2 * np.pi, 0, np.pi],
@@ -69,7 +54,7 @@ class TestPODESN:
 
         # observables from the training coefficients at the last snapshot
         Phi_last = case.Phi[:, -1][:, np.newaxis]              # (N_modes, 1)
-        y_model = case.get_observables(Phi=Phi_last)           # (Nq, 1)
+        y_model = case.get_observables(Z=Phi_last)           # (Nq, 1)
 
         # ground truth: raw data at the sensor grid locations (variable-block flattening)
         X_flat = X.transpose(1, 0, 2, 3).reshape(X.shape[1], -1)  # (N_t, Nu*Nx*Ny)

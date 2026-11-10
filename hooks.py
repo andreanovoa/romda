@@ -10,7 +10,7 @@ there. This also avoids staging a byte-for-byte copy of each source .ipynb
 inside docs_dir, which the mkdocs-jupyter plugin required.
 
 Raw HTML <img>/<video> tags authored in the notebooks (pointing at
-../../../docs/figs/...) pass through nbconvert unrewritten; a post-build pass
+../../docs/figs/...) pass through nbconvert unrewritten; a post-build pass
 over the built HTML recomputes each page's actual depth and fixes them, since
 MkDocs' own relative-link resolution only rewrites markdown-authored links,
 not arbitrary raw HTML content.
@@ -24,13 +24,14 @@ from nbconvert import MarkdownExporter
 from nbconvert.writers import FilesWriter
 
 REPO_ROOT = Path(__file__).parent
-SRC = REPO_ROOT / "scripts" / "tutorials"
+SRC = REPO_ROOT / "tutorials"
 DEST = REPO_ROOT / "docs" / "tutorials"
 
-# Natively rendered for now; the rest of 2_Real-time_DA_Thermoacoustics,
-# 3_Introduction_to_ROMs and 4_Real-time_DA_ROMs stay as GitHub links in
-# tutorials.md/nav until we're ready to pay their build-time and site-size cost.
-RENDERED_TOPICS = ["0_How_to_repo", "1_Introduction_to_real-time_DA"]
+# Natively rendered for now; 3_Introduction_to_ROMs and 4_Real-time_DA_ROMs stay
+# as GitHub links in tutorials.md/nav until we're ready to pay their build-time
+# and site-size cost.
+RENDERED_TOPICS = ["0_How_to_repo", "1_Introduction_to_real-time_DA",
+                   "2_Real-time_DA_Thermoacoustics"]
 # Single notebooks rendered from otherwise-linked topics (relative to SRC, no suffix).
 RENDERED_NOTEBOOKS = ["3_Introduction_to_ROMs/31_POD_SPOD", "3_Introduction_to_ROMs/35_POD_ESN_cylinder"]
 
@@ -57,7 +58,7 @@ def on_pre_build(config, **kwargs):
             return f"](../{rendered[stem]}/{stem}.md)"
         nb_path = next(SRC.rglob(f"{stem}.ipynb"), None)
         folder = nb_path.parent.name if nb_path else ""
-        return f"](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/scripts/tutorials/{folder}/{stem}.ipynb)"
+        return f"](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/tutorials/{folder}/{stem}.ipynb)"
 
     for topic_dest in {DEST / p.parent.name for p in nb_paths}:
         shutil.rmtree(topic_dest, ignore_errors=True)
@@ -84,3 +85,30 @@ def on_post_build(config, **kwargs):
         fixed = FIGS_HREF_RE.sub(lambda m: f'{m.group(1)}="{up}figs/{m.group(2)}"', text)
         if fixed != text:
             html_path.write_text(fixed, encoding="utf-8")
+
+
+# ── Google-style docstrings under the global numpy style ─────────────────────
+# mkdocstrings sets the parser of a block's root object to the block's
+# `docstring_style` (the global numpy one when the block sets none), and its
+# members keep the parser they were loaded with. Google-style modules then render
+# raw `Args:` text. This griffe extension (mkdocs.yml, `extensions`) pins the
+# Google parser on every docstring with a Google section header and no numpy
+# section underline, whatever the block options say.
+import griffe
+
+GOOGLE_SECTION_RE = re.compile(r"^\s*(Args|Arguments|Returns|Yields|Raises|Attributes|Examples?):\s*$", re.M)
+NUMPY_UNDERLINE_RE = re.compile(r"^\s*-{3,}\s*$", re.M)
+
+
+class _GoogleDocstring(griffe.Docstring):
+    """A docstring whose parser is always Google; assignments are ignored."""
+
+    parser = property(lambda self: griffe.Parser.google, lambda self, value: None)
+    parser_options = property(lambda self: {}, lambda self, value: None)
+
+
+class GoogleDocstrings(griffe.Extension):
+    def on_instance(self, *, obj, **kwargs):
+        doc = obj.docstring
+        if doc is not None and GOOGLE_SECTION_RE.search(doc.value) and not NUMPY_UNDERLINE_RE.search(doc.value):
+            doc.__class__ = _GoogleDocstring

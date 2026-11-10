@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use romda, please cite the release you employed and the papers listed in the README."
+title: "romda: real-time reduced-order modelling and bias-aware data assimilation"
+authors:
+  - family-names: "Nóvoa"
+    given-names: "Andrea"
+    affiliation: "Imperial College London"
+  - family-names: "Campbell"
+    given-names: "Lukas"
+  - family-names: "Eze"
+    given-names: "Ben"
+version: 3.2.0
+license: MIT
+repository-code: "https://github.com/andreanovoa/real-time-bias-aware-DA"
+url: "https://andreanovoa.github.io/real-time-bias-aware-DA/"
+keywords:
+  - data assimilation
+  - bias estimation
+  - reduced-order modelling
+  - ensemble Kalman filter

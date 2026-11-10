@@ -35,27 +35,34 @@ models in between:
 ## Quick example
 
 ```python
-from romda.estimators.ensembles import rBA_EnKF
-from romda.models.physical import VdP
+import numpy as np
 from romda.bias_estimators import ConstantBias
+from romda.estimators import EnsembleFilter
+from romda.models.physical import VdP
 from romda.observations import Observations
 
 truth = Observations(model=VdP, t_start=0.6, t_stop=0.8, Nt_obs=30,
-                      add_noise=True, manual_bias='linear')
+                     add_noise=True, manual_bias='linear')
+Cdd = np.diag((0.05 * np.max(abs(truth.y_obs), axis=0)) ** 2)
 
-ensemble = rBA_EnKF(parent_model=VdP(dt=truth.dt),
-                     parent_bias=ConstantBias,
-                     m=10, std_phi=0.1, std_alpha=dict(zeta=(40., 60.)))
+ensemble = EnsembleFilter(parent_model=VdP(dt=truth.dt), parent_bias=ConstantBias,
+                          type='stochastic',             # EnKF
+                          parameter_estimation='joint',  # state and parameters in one analysis
+                          bias_regularization=1.0,       # regularized bias-aware update
+                          m=10, std_phi=0.1, std_alpha=dict(zeta=(40., 60.)))
 
 for d, t_d in zip(truth.y_obs, truth.t_obs):
     ensemble.forecast_step(t_end=t_d)
-    ensemble.analysis_step(d=d, Cdd=...)
+    ensemble.analysis_step(d=d, Cdd=Cdd)
 ```
+
+This filter is the regularized bias-aware EnKF of Nóvoa, Racca & Magri (2023), which
+`romda.estimators.rBA_EnKF` also builds under its name in the paper.
 
 ## Where to go
 
 - [Getting started](getting-started.md) — install the package and run the first example.
-- [Experiments](experiments.md) — run physical-model and thermoacoustic cases.
+- [Examples](experiments.md) — complete experiments by topic: Lorenz twins, thermoacoustics, the POD-ESN cylinder wake.
 - [Class hierarchy](class-hierarchy.md) — how models, estimators, bias estimators and
   observations relate.
 - [API reference](api/index.md) — browse models, estimators, observations, and bias estimators.

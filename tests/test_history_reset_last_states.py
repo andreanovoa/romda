@@ -1,5 +1,4 @@
 import numpy as np
-
 from romda.models.history import HistoryTracker
 
 
@@ -29,8 +28,3 @@ def test_window_of_states_overwrites_that_window():
     assert np.allclose(h.hist[-3:], new)
     assert np.allclose(h.hist[:-3], hist[:-3])
 
-
-if __name__ == "__main__":
-    test_single_2d_state_only_touches_the_last_timestep()
-    test_window_of_states_overwrites_that_window()
-    print("ok")

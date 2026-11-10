@@ -1,7 +1,5 @@
 """Regression tests for the LinearModel / KalmanFilter fixes surfaced by tutorial 15."""
 import numpy as np
-import pytest
-
 from romda.estimators import KalmanFilter
 from romda.models.data_driven import LinearModel
 
@@ -39,7 +37,7 @@ def test_filename_and_init_ensemble():
 def test_kf_covariance_uses_model_F_per_step():
     Nt_obs, Cpp0 = 5, 0.5 * np.eye(2)
     model = LinearModel(F=F, M_obs=np.array([[1.0, 0.0]]), psi0=np.array([1.0, 0.0]), dt=1.0)
-    kf = KalmanFilter(N=2, Nq=1, Cdd=np.eye(1), psi0=np.array([1.0, 0.0]), Cpp0=Cpp0,
+    kf = KalmanFilter(Cdd=np.eye(1), psi0=np.array([1.0, 0.0]), Cpp0=Cpp0,
                       M=np.array([[1.0, 0.0]]), model=model)   # no F_jac: defaults to model.F
     kf.forecast_step(t_end=model.current_time + Nt_obs * model.dt)
     Fk = np.linalg.matrix_power(F, Nt_obs)
@@ -50,7 +48,7 @@ def test_kf_matches_hand_rolled_update():
     M = np.array([[1.0, 0.0]])
     Cdd, Cpp0, psi0 = np.array([[0.04]]), 0.5 * np.eye(2), np.array([1.0, 0.0])
     model = LinearModel(F=F, M_obs=M, psi0=psi0)
-    kf = KalmanFilter(N=2, Nq=1, Cdd=Cdd, psi0=psi0, Cpp0=Cpp0, M=M, model=model)
+    kf = KalmanFilter(Cdd=Cdd, psi0=psi0, Cpp0=Cpp0, M=M, model=model)
     kf.forecast_step(t_end=1.0)
     d = np.array([0.9])
     psi_a = kf.analysis_step(d, Cdd, return_analysis=True)
@@ -60,6 +58,3 @@ def test_kf_matches_hand_rolled_update():
     expected = F @ psi0 + K @ (d - M @ (F @ psi0))
     np.testing.assert_allclose(psi_a, expected)
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

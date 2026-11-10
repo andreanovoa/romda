@@ -11,9 +11,8 @@ and `start_param` defers parameter estimation.
 
 import numpy as np
 import pytest
-
 from romda.bias_estimators import ConstantBias, NoBias
-from romda.estimators import EnKF, EnSRKF, rBA_EnKF
+from romda.estimators import EnKF, EnSRKF, rEnKF
 from romda.models.physical import VdP
 from romda.observations import Observations
 
@@ -90,29 +89,31 @@ def test_parameters_stay_within_limits_or_rejected(truth_unbiased):
     assert np.all((alpha >= lo) & (alpha <= hi)) or len(ens.rejected_analysis.times) > 0
 
 
-def test_start_param_freezes_parameters(truth_unbiased):
-    ens = make_ensemble(truth_unbiased, da_method=EnKF, start_param=3)
-    Cdd = obs_covariance(truth_unbiased)
-    alpha0 = ens.current_state[-ens.Na:, :].copy()
-    for k, (d, t_d) in enumerate(zip(truth_unbiased.y_obs, truth_unbiased.t_obs)):
-        ens.forecast_step(t_end=t_d)
-        ens.analysis_step(d=d, Cdd=Cdd.copy())
-        alpha = ens.current_state[-ens.Na:, :]
-        if k + 1 <= 3:
-            # state-estimation only: the analysis leaves the parameters at their forecast
-            np.testing.assert_allclose(alpha, alpha0)
-        if k >= 4:
-            break
-    ens.model.close()
-
-
 @pytest.mark.parametrize('bias_cls', [NoBias, ConstantBias])
 def test_bias_aware_loop_runs(truth_biased, bias_cls):
-    ens = run_da(make_ensemble(truth_biased, da_method=rBA_EnKF, bias=bias_cls,
-                               gamma=1.), truth_biased)
+    ens = run_da(make_ensemble(truth_biased, da_method=rEnKF, bias=bias_cls,
+                               bias_regularization=1.), truth_biased)
     assert np.isfinite(ens.model.hist).all()
     assert np.isfinite(ens.bias.hist).all()
     # model and bias histories stay synchronized in time
     assert abs(ens.bias.current_time - ens.model.current_time) < ens.model.dt
     if bias_cls is NoBias:
         np.testing.assert_allclose(ens.bias.hist, 0.)
+
+
+def test_renkf_at_zero_bias_equals_the_enkf(truth_unbiased):
+    # With zero bias and zero Jacobian the regularized bias-aware gain must reduce exactly
+    # to the EnKF gain (Novoa et al. 2023, erratum 2024): C_yy = C_dd + C_qq with C_qq the
+    # per-sample covariance. Weighting C_dd by (m - 1) instead would inflate the
+    # observation noise m - 1 times and divide the effective gamma by m - 1.
+    Cdd = obs_covariance(truth_unbiased)
+    d, t_d = truth_unbiased.y_obs[0], truth_unbiased.t_obs[0]
+    states = []
+    for da_method, kwargs in ((EnKF, {}), (rEnKF, dict(bias=NoBias, bias_regularization=1.0))):
+        ens = make_ensemble(truth_unbiased, da_method=da_method, **kwargs)
+        ens.forecast_step(t_end=t_d)
+        ens.rng = np.random.default_rng(7)               # identical observation perturbations
+        ens.analysis_step(d=d, Cdd=Cdd.copy())
+        states.append(np.array(ens.model.current_state))
+        ens.model.close()
+    np.testing.assert_allclose(states[1], states[0], atol=1e-10)

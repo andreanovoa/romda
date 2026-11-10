@@ -2,7 +2,7 @@
 
 The tutorial notebooks below build up from the basic classes to full real-data digital
 twins, numbered by topic. The source lives in
-[`scripts/tutorials`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/scripts/tutorials).
+[`tutorials/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/tutorials).
 Topics 0 and 1, and the POD / POD-ESN notebooks of topic 3, are rendered inline (with
 saved outputs); the rest link out to GitHub for now. Two arcs run through them: DA
 concepts (1) applied to physical models (2), and reduced-order-model concepts (3)
@@ -32,9 +32,9 @@ combined with DA in real time (4).
 
 | Notebook | Contents |
 | --- | --- |
-| [Rijke tube: model and DA](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/scripts/tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.ipynb) | The Rijke-tube low-order model, then twin state/parameter estimation with the EnKF. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_rijke.html). |
-| [TABADA Rijke (CMAME)](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/scripts/tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.ipynb) | Bias-aware DA on the Rijke tube with an ESN bias estimator. |
-| [Annular combustor: model, data and digital twin](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/scripts/tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.ipynb) | The annular-combustor low-order model, the experimental recordings, and a real-data digital twin with bias-aware DA. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_annular.html).* |
+| [Rijke tube: model and DA](tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md) | The Rijke-tube low-order model, then twin state/parameter estimation with the EnKF. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_rijke.html). |
+| [TABADA Rijke (CMAME)](tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md) | Bias-aware DA on the Rijke tube with an ESN bias estimator. |
+| [Annular combustor: model, data and digital twin](tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.md) | The annular-combustor low-order model, the experimental recordings, and a real-data digital twin with bias-aware DA. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_annular.html).* |
 
 ## 3. Introduction to reduced-order models
 
@@ -47,7 +47,7 @@ combined with DA in real time (4).
 
 | Notebook | Contents |
 | --- | --- |
-| [Real-time DA with POD-ESN](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/scripts/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb) | Assimilating sparse sensors into the POD-ESN wake model.* |
+| [Real-time DA with POD-ESN](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb) | Assimilating sparse sensors into the POD-ESN wake model.* |
 
 
 \* These notebooks download their dataset from [Zenodo](https://zenodo.org/) on first use ([annular data](https://zenodo.org/records/15609832), [wake data](https://zenodo.org/records/15623774)).

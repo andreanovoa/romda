@@ -1,8 +1,18 @@
-# Running physical experiments
+# Examples
 
-The public repository includes physical-model and thermoacoustic data-assimilation
-experiments. Their YAML configurations are in `configs/twin_da/` and `configs/tai_da/`.
-Run them from the repository root after installing `romda` in editable mode:
+The [`examples/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/examples) folder of the
+repository holds complete experiments, one folder per topic. Each case is a YAML configuration, with a
+script next to it when the case needs figures or steps of its own, and most cases have a sweep script that
+repeats them over a grid of settings. Every case writes its outputs next to its own configuration, and the
+README of each topic lists the published works that it supports.
+
+| Topic | Cases | What it shows |
+|---|---|---|
+| [`lorenz/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/examples/lorenz) | `lorenz63`, `lorenz96` | Twin experiments on chaotic systems: stochastic and square-root EnKF, combined state and parameter estimation, the rBA-EnKF on biased observations. |
+| [`thermoacoustics/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/examples/thermoacoustics) | `annular`, `rijke`, `vdp` | Twin experiments on the Rijke tube and the Van der Pol oscillator, and the real-time digital twin of raw experimental data from an annular combustor. |
+| [`rom_da/cylinder/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/examples/rom_da/cylinder) | `pod_esn` | Real-time data assimilation with a POD-ESN reduced-order model of the cylinder wake, with online learning of the ESN output weights. |
+
+Install `romda` in editable mode from a clone of the repository, and run the commands from its root:
 
 ```bash
 pip install -e ".[dev,notebooks]" --use-pep517
@@ -16,7 +26,7 @@ Use `romda.experiments.run_experiment` from Python:
 from romda.experiments import run_experiment
 
 filter_ensemble, truth, metrics = run_experiment(
-    "configs/tai_da/rijke.yml",
+    "examples/thermoacoustics/rijke.yml",
     seed=1,
 )
 print(metrics)
@@ -25,27 +35,37 @@ print(metrics)
 The same runner is available from the command line:
 
 ```bash
-python -m romda.experiments configs/twin_da/lorenz63.yml --seed 3
-python -m romda.experiments configs/tai_da/rijke.yml --seed 1
-python -m romda.experiments configs/tai_da/annular.yml --set truth.ER=0.5375
+python -m romda.experiments examples/lorenz/lorenz63.yml --seed 3
+python -m romda.experiments examples/thermoacoustics/rijke.yml --seed 1
+python -m romda.experiments examples/thermoacoustics/annular.yml --set truth.ER=0.5375
 ```
 
-The `--seed` option redraws the initial ensemble while keeping the physical truth fixed.
+The `--seed` option redraws the initial ensemble and the observation noise on the same physical truth;
+the same seed gives the same numbers. The noise comes from one shared generator, `romda.utils.noise_rng`,
+which `romda.utils.seed_noise` restarts.
 Use `--set key=value` for temporary dotted-key overrides. Numbers, booleans, lists, and
 `null` are parsed as JSON. The final output line contains the experiment metrics as JSON.
 
-The annular case downloads its experimental data on first use. Generated data and results
-are written under `results/`.
+The scripts of the cases add the figures, for example:
 
-## Available cases
+```bash
+python examples/lorenz/lorenz63.py --save-figs
+python examples/run_config.py thermoacoustics/vdp --save-figs
+python examples/rom_da/cylinder/pod_esn.py --save-figs
+```
+
+The annular and cylinder cases download their data on first use, into `data/` at the repository root.
+
+## Available configurations
 
 | Configuration | Experiment |
 |---|---|
-| `configs/twin_da/lorenz63.yml` | Lorenz 63 twin |
-| `configs/twin_da/lorenz96.yml` | Lorenz 96 twin |
-| `configs/tai_da/vdp.yml` | Van der Pol twin |
-| `configs/tai_da/rijke.yml` | Rijke-tube twin |
-| `configs/tai_da/annular.yml` | Annular experimental data |
+| `examples/lorenz/lorenz63.yml` | Lorenz 63 twin |
+| `examples/lorenz/lorenz96.yml` | Lorenz 96 twin |
+| `examples/thermoacoustics/vdp.yml` | Van der Pol twin |
+| `examples/thermoacoustics/rijke.yml` | Rijke-tube twin |
+| `examples/thermoacoustics/annular.yml` | Annular experimental data |
+| `examples/rom_da/cylinder/pod_esn.yml` | POD-ESN cylinder wake (through its script only) |
 
 The Python API returns the filtered ensemble, truth observations, and a metrics dictionary,
 which can be used to create custom plots or further analysis.

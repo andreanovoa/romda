@@ -1,5 +1,5 @@
 # Publish to PyPI (trusted publishing) when a vX.Y.Z tag lands on the PUBLIC repo.
-# Release flow: bump_release.sh in the private repo, then scripts/publish_public.py --push --tag.
+# Release flow: bump_release.sh in the private repo, then tools/publish_public.py --push --tag.
 # The job is guarded so the same file is inert in the private development repo.
 name: release
 

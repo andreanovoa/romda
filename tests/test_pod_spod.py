@@ -1,31 +1,9 @@
 """Tests for the POD / SPOD decompositions (models.data_driven.autoencoders: pod, pod_utils)."""
 import numpy as np
 import pytest
-
+from conftest import synthetic_flow
 from romda.models.data_driven.autoencoders import POD, SPOD, spod_towne
 from romda.models.data_driven.autoencoders.pod_utils import snapshot_pod, snapshot_pod_randomized, spod_sieber
-
-
-def synthetic_flow(N_t=200, Nx=24, Ny=12, noise=0.0, seed=0):
-    """Synthetic 2-field snapshot data (Nu, N_t, Nx, Ny) with a NaN 'body' mask
-    and two travelling-wave modes."""
-    rng = np.random.default_rng(seed)
-    t = np.linspace(0, 8 * np.pi, N_t)
-    x = np.linspace(0, 2 * np.pi, Nx)
-    y = np.linspace(0, np.pi, Ny)
-    X, Y = np.meshgrid(x, y, indexing='ij')
-
-    u = (np.sin(X)[None] * np.cos(t)[:, None, None]
-         + 0.5 * np.sin(2 * X + Y)[None] * np.sin(2 * t)[:, None, None])
-    v = (np.cos(X + Y)[None] * np.sin(t)[:, None, None])
-    if noise > 0:
-        u = u + noise * rng.standard_normal(u.shape)
-        v = v + noise * rng.standard_normal(v.shape)
-
-    # mask a small solid body
-    u[:, 2:4, 2:4] = np.nan
-    v[:, 2:4, 2:4] = np.nan
-    return np.array([u, v])  # (2, N_t, Nx, Ny)
 
 
 class TestPOD:
@@ -136,6 +114,18 @@ class TestSPOD:
         assert np.isfinite(spod.Sigma).all()
         assert hasattr(spod, 'C_tilde')
 
+    def test_encode_inverts_decode_and_cannot_beat_pod(self):
+        """Regression: for Nf > 0 the SPOD spatial modes are not orthonormal, so
+        Psi^T encoding did not invert decode (reconstruction error ~800 %)."""
+        X = synthetic_flow(noise=0.05)
+        spod = SPOD(Nf=10, n_modes=6).fit(X)
+        Z = spod.Phi[:, :7]
+        np.testing.assert_allclose(spod.encode(spod.decode(Z)), Z, atol=1e-8)
+        Q = spod.preprocess_snapshot(X)
+        pod = POD(n_modes=6, method='exact').fit(X)
+        err_pod, err_spod = (np.linalg.norm(m.decode(m.encode(X)) - m.Q_mean - Q) for m in (pod, spod))
+        assert err_pod <= err_spod + 1e-10 <= np.linalg.norm(Q)
+
 
 class TestFunctionalAPI:
 
@@ -161,6 +151,25 @@ class TestFunctionalAPI:
         S1 = spod_sieber(Q, Nf=0)[0]
         np.testing.assert_allclose(S0, S1, atol=1e-10)
 
+    def test_spod_sieber_matches_hand_built_diagonal_filter(self):
+        """Regression: spod_sieber filtered C as G^T C G (POD of time-filtered data)
+        instead of Sieber's diagonal filter S_ij = sum_k g_k C_{i+k, j+k} (periodic)."""
+        from romda.models.data_driven.autoencoders.pod_utils import _filter_kernel
+        rng = np.random.default_rng(5)
+        Q = rng.normal(size=(15, 30))
+        Q -= Q.mean(axis=1, keepdims=True)
+        Nf, N_t = 4, Q.shape[1]
+        C, g = Q.T @ Q / N_t, _filter_kernel(Nf, 'gaussian')
+        S = np.zeros_like(C)
+        for i in range(N_t):
+            for j in range(N_t):
+                S[i, j] = sum(g[k + Nf] * C[(i + k) % N_t, (j + k) % N_t] for k in range(-Nf, Nf + 1))
+        Sigma, Psi, Phi, C_tilde = spod_sieber(Q, Nf)
+        np.testing.assert_allclose(C_tilde, S, atol=1e-12)
+        np.testing.assert_allclose(Sigma ** 2, np.sort(np.linalg.eigvalsh(S))[::-1], atol=1e-10)
+        np.testing.assert_allclose(Phi @ Phi.T, N_t * np.diag(Sigma ** 2), atol=1e-8)
+        np.testing.assert_allclose(Psi @ Phi, Q, atol=1e-8)
+
     def test_spod_towne_runs(self):
         """Regression test: spod_towne previously crashed with NameError
         (missing get_window / gammaincinv imports)."""
@@ -171,6 +180,28 @@ class TestFunctionalAPI:
         L, Psi, f, Lc, info = spod_towne(Q, dt=t[1] - t[0], n_fft=128)
         assert L.shape[0] == len(f)
         assert np.isfinite(L).all()
+        # regression: gammaincinv took (p, n_blks) in MATLAB order, so Lc was all NaN
+        assert np.isfinite(Lc).all()
+        assert (Lc[..., 0] <= Lc[..., 1]).all()
         # the dominant frequency should be ~1/(2 pi)
         f_peak = f[np.argmax(L[:, 0])]
         assert f_peak == pytest.approx(1 / (2 * np.pi), rel=0.2)
+
+
+def test_pod_rejects_unknown_keywords_and_keeps_explicit_n_modes():
+    """Regression: POD dropped typos silently, and an explicit n_modes=20 was
+    overridden by the rows of a pre-set Phi."""
+    with pytest.raises(TypeError, match="n_mode"):
+        POD(n_mode=3)
+    assert POD(n_modes=20, Phi=np.zeros((5, 10))).N_latent == 20
+    assert POD(Phi=np.zeros((5, 10))).N_latent == 5
+
+
+def test_error_metrics_do_not_mutate_their_inputs():
+    """Regression: compute_RMS (and compute_MSE on >2-D input) set NaN to 0 in the caller's array."""
+    truth = np.ones((2, 3, 4))
+    truth[0, 0, 0] = np.nan
+    POD.compute_MSE(np.zeros_like(truth), truth)
+    POD.compute_RMS(np.zeros_like(truth), truth)
+    assert np.isnan(truth[0, 0, 0])
+    np.testing.assert_array_equal(POD.compute_RMS(np.zeros(2), np.array([-2.0, np.nan])), [2.0, 0.0])

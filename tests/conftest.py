@@ -1,33 +1,31 @@
 """
 Shared configuration for the test suite.
 
-The tests import the project as ``romda`` (e.g. ``from romda.estimators import EnSRKF``).
-The package maps onto the ``src`` directory (see ``[tool.setuptools]`` in pyproject.toml),
-so if ``romda`` is not pip-installed we register ``src`` as the ``romda`` package here.
+The tests import the installed package as ``romda`` (``pip install -e .``).
 """
-import importlib.util
-import os
-import sys
 
 import matplotlib
+import numpy as np
 
 matplotlib.use('Agg')  # never open figure windows during tests
 
-SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-try:
-    import romda  # noqa: F401  (installed, e.g. via `pip install -e .`)
-except ImportError:
-    spec = importlib.util.spec_from_file_location(
-        'romda', os.path.join(SRC, '__init__.py'),
-        submodule_search_locations=[SRC])
-    module = importlib.util.module_from_spec(spec)
-    sys.modules['romda'] = module
-    spec.loader.exec_module(module)
+def synthetic_flow(N_t=200, Nx=24, Ny=12, noise=0.0, body=True, seed=0):
+    """Two travelling-wave fields ``(2, N_t, Nx, Ny)``, three coherent structures plus
+    `noise`, with a NaN 'body' mask unless ``body=False``. The packaged
+    `romda.models.data_driven.synthetic_field` is the ``noise=0.02, body=False`` case."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, 8 * np.pi, N_t)
+    x = np.linspace(0, 2 * np.pi, Nx)
+    y = np.linspace(0, np.pi, Ny)
+    X, Y = np.meshgrid(x, y, indexing='ij')
 
-    # This shim exists only in this process. Python >= 3.14 defaults to the
-    # forkserver start method on Linux, whose workers cannot import 'romda'
-    # and die unpickling pool tasks, hanging IVPIntegrator forever. Force
-    # fork so workers inherit the shim (only needed when not pip-installed).
-    import multiprocessing
-    multiprocessing.set_start_method('fork', force=True)
+    u = (np.sin(X)[None] * np.cos(t)[:, None, None]
+         + 0.5 * np.sin(2 * X + Y)[None] * np.sin(2 * t)[:, None, None])
+    v = np.cos(X + Y)[None] * np.sin(t)[:, None, None]
+    u = u + noise * rng.standard_normal(u.shape)
+    v = v + noise * rng.standard_normal(v.shape)
+    if body:
+        u[:, 2:4, 2:4] = v[:, 2:4, 2:4] = np.nan
+    return np.array([u, v])
+

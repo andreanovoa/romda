@@ -1,9 +1,8 @@
 """Tests for the Observations (truth/data generation) class."""
 import numpy as np
 import pytest
-
-from romda.observations import Observations
 from romda.models.physical import VdP
+from romda.observations import Observations
 
 
 def make_truth(**kwargs):

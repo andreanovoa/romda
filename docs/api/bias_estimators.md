@@ -2,7 +2,7 @@
 
 ## Summary
 
-**File:** `src/bias_estimators/bias.py`
+**File:** `src/romda/bias_estimators/bias.py`
 
 Base class for observation-bias estimators. Mixes in `HistoryTracker`. Wraps a `forecaster` model to produce bias corrections at each assimilation step.
 
@@ -21,9 +21,9 @@ Bias
 
 | Class | File | Notes |
 |---|---|---|
-| `ESN_bias` | `src/bias_estimators/esn.py` | Correlation-based training; `biased_observations = True` |
-| `ConstantBias` | `src/bias_estimators/constantbias.py` | Persistent bias, reset to the latest innovation each analysis step |
-| `NoBias` | `src/bias_estimators/constantbias.py` | `ConstantBias` fixed at zero; unbiased-limit placeholder |
+| `ESN_bias` | `src/romda/bias_estimators/esn.py` | Correlation-based training; `biased_observations = True` |
+| `ConstantBias` | `src/romda/bias_estimators/constantbias.py` | Persistent bias, reset to the latest innovation each analysis step |
+| `NoBias` | `src/romda/bias_estimators/constantbias.py` | `ConstantBias` fixed at zero; unbiased-limit placeholder |
 
 ### Forecaster
 
@@ -52,9 +52,8 @@ The forecaster is initialised inside `init_forecaster()` and stepped forward in 
 
 ::: romda.bias_estimators.NoBias
 
-
 ::: romda.bias_estimators.aux.create_bias_training_dataset
 
 ::: romda.bias_estimators.aux.sample_model_states
 
-::: romda.bias_estimators.plot_train_data
+::: romda.bias_estimators.aux.plot_train_data
