@@ -157,6 +157,6 @@ Standalone class (no inheritance). Generates or loads the reference solution, ap
 
 **Noise options** (`noise_type`): `'gauss, add'`, `'gauss, mult'`, coloured noise variants.
 
-**Manual bias options** (`manual_bias`): `'linear'`, `'periodic'`, `'time'`, `'cosine'`, or any callable `f(y_true, t_true) -> (b, name)`.
+**Manual bias options** (`manual_bias`): `'linear'`, `'linear_offset'`, `'periodic'`, `'time'`, `'cosine'`, `'cosine_squared'`, or any callable `f(y_true, t_true) -> (b, name)`.
 
 **Key method:** `plot_truth(case)` — five-panel figure (raw, truth, PDF, PSD, difference).

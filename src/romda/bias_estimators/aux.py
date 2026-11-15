@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 def prepare_reference_data(reference_data: Observations | list[Observations],
-                           minimum_training_steps: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
+                           minimum_training_steps: int,
+                           training_record: str = 'end') -> tuple[list[np.ndarray], list[np.ndarray]]:
     """Prepare reference data for training the bias model.
 
     Extracts the raw observations and true values from the reference data, trimmed
-    to the trailing `minimum_training_steps` time steps.
+    to `minimum_training_steps` time steps: the last steps of the record or the first.
 
     Parameters
     ----------
@@ -27,6 +28,11 @@ def prepare_reference_data(reference_data: Observations | list[Observations],
     minimum_training_steps : int
         Minimum number of training steps required; each returned array is trimmed to
         this length.
+    training_record : {'end', 'start'}
+        The steps of the record that train the bias model. ``'end'``: the last steps, i.e. after the
+        assimilation window when the record ends at ``t_max``, as the v1.0 code. ``'start'``: the first
+        steps, before the assimilation, as Nóvoa et al. (2024) describe; the assimilation must then start
+        after them.
 
     Returns
     -------
@@ -37,6 +43,8 @@ def prepare_reference_data(reference_data: Observations | list[Observations],
     """
 
 
+    if training_record not in ('end', 'start'):
+        raise ValueError(f"training_record={training_record!r}: expected 'end' or 'start'.")
     if isinstance(reference_data, Observations):
         reference_data = [reference_data]
 
@@ -48,8 +56,16 @@ def prepare_reference_data(reference_data: Observations | list[Observations],
         if yt.ndim == 2:
             yt = yt[:, :, np.newaxis]
 
-        y_raw.append(yr[-minimum_training_steps:])
-        y_true.append(yt[-minimum_training_steps:])
+        if training_record == 'end':
+            y_raw.append(yr[-minimum_training_steps:])
+            y_true.append(yt[-minimum_training_steps:])
+        else:
+            if rfd.t_obs[0] < rfd.t_true[min(minimum_training_steps, len(rfd.t_true)) - 1]:
+                raise ValueError(f"training_record='start': the first {minimum_training_steps} steps of the record "
+                                 f'end at t = {rfd.t_true[min(minimum_training_steps, len(rfd.t_true)) - 1]:.4g}, '
+                                 f'after the first observation, t = {rfd.t_obs[0]:.4g}.')
+            y_raw.append(yr[:minimum_training_steps])
+            y_true.append(yt[:minimum_training_steps])
 
     return y_raw, y_true
 
@@ -58,15 +74,20 @@ def correlate_data(y_L_model: np.ndarray,
                     y_raw: np.ndarray,
                     augment_len: int,
                     minimum_training_steps: int,
+                    lag_criterion: str = 'correlation',
                 ) -> np.ndarray:
 
     """Correlate model-generated data with raw observations to build a training set.
 
-    1. Computes the correlation between the model-generated data and the raw
-       observations.
-    2. Identifies the best lag for each observed variable.
+    1. Computes the correlation (or the distance) between the model-generated data and the raw
+       observations, for every lag of the model within the extra steps of its record.
+    2. Identifies the best lag for each trajectory.
     3. Constructs a training dataset from the model data at these optimal lags,
        optionally augmented with a mid-point and/or worst-lag sample.
+
+    With ``lag_criterion='correlation'`` the best lag has the largest correlation with the centred,
+    normalized observations, and the worst the smallest. With ``'distance'`` the best lag has the smallest
+    squared distance to the observations, and the worst the largest, as in Appendix C of Nóvoa et al. (2024).
 
     Parameters
     ----------
@@ -79,6 +100,8 @@ def correlate_data(y_L_model: np.ndarray,
         lag; 2 adds a mid-point lag; 3 also adds the worst lag.
     minimum_training_steps : int
         Minimum number of training steps required.
+    lag_criterion : {'correlation', 'distance'}
+        How the best and the worst lags are selected (see above).
 
     Returns
     -------
@@ -86,6 +109,8 @@ def correlate_data(y_L_model: np.ndarray,
         Training data assembled from the best- (and optionally mid-/worst-) lag
         model trajectories.
     """
+    if lag_criterion not in ('correlation', 'distance'):
+        raise ValueError(f"lag_criterion={lag_criterion!r}: expected 'correlation' or 'distance'.")
 
     Nt_min = minimum_training_steps
     Nt, Nq, L = y_L_model.shape
@@ -99,7 +124,11 @@ def correlate_data(y_L_model: np.ndarray,
     y_raw_c /= (np.max(np.abs(y_raw_c), axis=0, keepdims=True) + epsilon)
 
     shifted_y_model_list = [y_L_model[lag: N_corr + lag] for lag in range(N_corr)]
-    correlations = np.array([correlation(y_raw_c, yy) for yy in shifted_y_model_list])
+    if lag_criterion == 'correlation':
+        correlations = np.array([correlation(y_raw_c, yy) for yy in shifted_y_model_list])
+    else:       # minus the squared distance to the observations, so that the best lag is again the largest value
+        data = y_raw[:N_corr]                                                   # (N_corr, Nq, 1)
+        correlations = -np.array([np.sum((yy - data) ** 2, axis=(0, 1)) for yy in shifted_y_model_list])
 
     for ii in range(L):
         corr_values = correlations[:, ii]
@@ -123,6 +152,7 @@ def sample_model_states(rom: Model,
                         minimum_training_steps: int,
                         std_phi: float | np.ndarray | None = None,
                         std_alpha: float | dict[str, float | list[float] | tuple[float, float]] | None = None,
+                        keep_fixed_points: float | None = None,
                     ) -> np.ndarray:
     """Sample model states from the ROM to build a training dataset for the bias model.
 
@@ -140,9 +170,10 @@ def sample_model_states(rom: Model,
     minimum_training_steps : int
         Minimum number of time steps to integrate the ROM for, to generate enough
         data for training the bias model.
-    std_phi : float, optional
-        Standard deviation for sampling the initial conditions. If None (default),
-        the standard deviation of the ROM's current state is used.
+    std_phi : float or ndarray, optional
+        Spread of the initial conditions relative to their mean (each component is drawn
+        uniformly in ``mean * [1 - std_phi, 1 + std_phi]``). If None (default), the
+        standard deviation of the ROM's current ensemble over the magnitude of its mean.
     std_alpha : float or dict, optional
         Standard deviation for sampling the parameters. A float is used as a
         multiplier on the current-state standard deviation, giving a
@@ -150,6 +181,14 @@ def sample_model_states(rom: Model,
         parameter; a dict should have parameter names as keys and per-parameter
         standard deviations as values. If None (default), the range is taken from
         the current state of the ROM.
+    keep_fixed_points : float, optional
+        What happens to the members that settle on a fixed point during the transient, when they are a
+        fifth of the members or more. None (default): one is kept, and the others are drawn again about the
+        mean of the oscillating members, with `std_phi` and `std_alpha`. A fraction, e.g. 0.2: that
+        fraction of the `L` members, plus one, is kept at the fixed point, and the others are drawn from the
+        normal distribution fitted to the members that remain (state and parameters), as the v1.0 code
+        does with 0.2. A network trained with fixed points learns the bias of a model that does not
+        oscillate, i.e. the whole signal.
 
     Returns
     -------
@@ -161,7 +200,12 @@ def sample_model_states(rom: Model,
     model = rom.copy()
 
     if std_phi is None:
-        std_phi = np.std(model.current_state[:model.Nphi, :], axis=-1)
+        # The spread of the current ensemble, relative to its mean: `mean_vector_to_ensemble` multiplies the mean
+        # by 1 + U(-std, std), so the standard deviation itself (an absolute spread) gave the members of the
+        # annular case a relative spread of about 15 in the velocities.
+        phi = model.current_state[:model.Nphi, :]
+        mean_phi = np.abs(np.mean(phi, axis=-1))
+        std_phi = np.std(phi, axis=-1) / np.where(mean_phi > 0., mean_phi, 1.)
 
     if std_alpha is None:
         std_alpha = {}
@@ -202,6 +246,17 @@ def sample_model_states(rom: Model,
     psi0 = np.mean(model.current_state.copy(), axis=-1)
     Nt = int(np.round(model.t_transient / model.dt, model.precision_t)) - 1
 
+    # A state that already holds parameter rows orders them as model.est_alpha (sorted by init_ensemble), while
+    # mean_vector_to_ensemble fills them in the order of the dict: re-key the dict in the order of the rows, as
+    # init_ensemble does. Otherwise each parameter is drawn from the range of another (annular: epsilon from the
+    # c2beta range, which gives a negative stiffness and members that diverge).
+    if isinstance(std_alpha, dict) and psi0.shape[0] > model.Nphi:
+        missing = [key for key in model.est_alpha if key not in std_alpha]
+        if missing:
+            raise ValueError(f'std_alpha has no range for the estimated parameters {missing} of the state '
+                             f'(est_alpha = {list(model.est_alpha)})')
+        std_alpha = {key: std_alpha[key] for key in model.est_alpha}
+
     # Add parameters to the state vector if parameter uncertainty is given
     if std_alpha and psi0.shape[0] == model.Nphi:
         assert isinstance(std_alpha, dict), "std_alpha must be a dict if parameter uncertainty is specified."
@@ -228,9 +283,15 @@ def sample_model_states(rom: Model,
     idx_fixed = range_y < tol
 
     if len(np.flatnonzero(idx_fixed)) / len(idx_fixed) >= 0.2:
-        idx_fixed[np.flatnonzero(idx_fixed)[0]] = 0
-        psi0 = psi_last[:, ~idx_fixed]
-        new_psi0 = sample_ensemble(np.mean(psi0, axis=-1), len(np.flatnonzero(idx_fixed)))
+        if keep_fixed_points is None:
+            idx_fixed[np.flatnonzero(idx_fixed)[0]] = 0
+            psi0 = psi_last[:, ~idx_fixed]
+            new_psi0 = sample_ensemble(np.mean(psi0, axis=-1), len(np.flatnonzero(idx_fixed)))
+        else:
+            idx_fixed[np.flatnonzero(idx_fixed)[:int(keep_fixed_points * len(idx_fixed)) + 1]] = 0
+            psi0 = psi_last[:, ~idx_fixed]
+            new_psi0 = model.rng.multivariate_normal(np.mean(psi0, axis=-1), np.cov(psi0),
+                                                     len(np.flatnonzero(idx_fixed))).T
         psi0 = np.concatenate([psi0, new_psi0], axis=-1)
     else:
         psi0 = psi_last
@@ -250,6 +311,7 @@ def load_bias_training_dataset(
     augment_data_length: int,
     L: int,
     expected_Ndim: int | None = None,
+    defaults: dict | None = None,
 ):
     """Load a cached bias-training dataset from disk, if valid.
 
@@ -272,6 +334,9 @@ def load_bias_training_dataset(
         Expected number of samples of the cached data.
     expected_Ndim : int, optional
         Expected trailing (observable) dimension of the cached data.
+    defaults : dict, optional
+        The configuration of a file that does not store a key of `necessary_properties`: a dataset cached
+        before an option existed was built with the default of that option.
 
     Returns
     -------
@@ -292,7 +357,8 @@ def load_bias_training_dataset(
         logger.debug('Bias training data: the loaded file is a %s, not a dictionary; creating it',
                      type(loaded_train_data).__name__)
         return None
-    elif not check_valid_file(loaded_train_data, necessary_properties):
+    elif not check_valid_file({**(defaults or {}), **loaded_train_data}, necessary_properties):
+        print('Re-run multi-parameter training data: the cached dataset was built with other options')
         return None
     else:
         # Check if the data has enough time steps and matches the expected shape based on augment_data_length and L
@@ -325,6 +391,9 @@ def create_bias_training_dataset(config: dict,
                                 biased_observations: bool,
                                 std_phi: float | None = None,
                                 std_alpha: float | dict[str, float | list[float]] | None = None,
+                                training_record: str = 'end',
+                                lag_criterion: str = 'correlation',
+                                keep_fixed_points: float | None = None,
                             ) -> dict:
 
     """Build a training dataset for the bias model from ROM samples and reference data.
@@ -356,6 +425,12 @@ def create_bias_training_dataset(config: dict,
         Standard deviation for sampling initial conditions; see `sample_model_states`.
     std_alpha : float or dict, optional
         Standard deviation for sampling parameters; see `sample_model_states`.
+    training_record : {'end', 'start'}
+        The steps of the reference record that the model is compared with; see `prepare_reference_data`.
+    lag_criterion : {'correlation', 'distance'}
+        Selection of the lags of the correlation-based training; see `correlate_data`.
+    keep_fixed_points : float, optional
+        The members that settle on a fixed point; see `sample_model_states`.
 
     Returns
     -------
@@ -372,18 +447,21 @@ def create_bias_training_dataset(config: dict,
                                     L=L,
                                     minimum_training_steps=minimum_training_steps,
                                     std_phi=std_phi,
-                                    std_alpha=std_alpha)
+                                    std_alpha=std_alpha,
+                                    keep_fixed_points=keep_fixed_points)
 
     logger.debug('Preparing the reference data for training; model samples of shape %s', y_model_L.shape)
 
-    y_raw, y_true = prepare_reference_data(reference_data, minimum_training_steps=minimum_training_steps)
+    y_raw, y_true = prepare_reference_data(reference_data, minimum_training_steps=minimum_training_steps,
+                                           training_record=training_record)
     # Augmentation: the correlated data carry their mid/worst lags, the direct pairing scaled copies.
     scales = (1., 1e-1, -1e-2) if augment_data_length > 1 and not correlation_based_training else (1.,)
 
     innovations_all, model_bias_all, y_model = [], [], []
     for yr, yt in zip(y_raw, y_true):
         if correlation_based_training:
-            ym_L = correlate_data(y_model_L, yr, augment_data_length, minimum_training_steps)
+            ym_L = correlate_data(y_model_L, yr, augment_data_length, minimum_training_steps,
+                                  lag_criterion=lag_criterion)
             y_model.append(ym_L)
         else:
             ym_L = y_model_L[-minimum_training_steps:]

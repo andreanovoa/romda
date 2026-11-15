@@ -8,9 +8,9 @@ import echostatenetwork
 import numpy as np
 import pytest
 import romda
+from conftest import vdp_twin
 from echostatenetwork import EchoStateNetwork
-from romda.models.physical import Lorenz63, VdP
-from romda.observations import Observations
+from romda.models.physical import Lorenz63
 
 #: dynamodels: the pool of an ensemble forecast ('Initializing multiprocessing pool ...' in 0.6.0,
 #: '<model>: starting a pool of n worker processes ...' later)
@@ -32,8 +32,7 @@ def ensemble_forecast():
 
 
 def noisy_observations():
-    return Observations(model=VdP, t_start=0.6, t_stop=0.75, t_max=0.9, Nt_obs=30,
-                        add_noise=True, noise_type='gauss, add', noise_level=0.01, manual_bias='linear')
+    return vdp_twin('linear')
 
 
 def esn_trained_twice():
@@ -63,6 +62,8 @@ def test_silent_by_default(capsys, caplog):
 def test_set_verbose_on_and_off(capsys, caplog):
     romda.set_verbose(True)
     romda.set_verbose(True)                                         # idempotent: one handler per package
+    if LOGGING_DYNAMODELS:
+        dynamodels.set_verbose(True)                                # one handler, with dynamodels' switch too
     for package in ('romda', 'dynamodels', 'echostatenetwork'):
         handlers = logging.getLogger(package).handlers
         assert sum(h.get_name() == f'{package}.verbose' for h in handlers) == 1
@@ -80,14 +81,6 @@ def test_set_verbose_on_and_off(capsys, caplog):
     noisy_observations()
     assert 'pool' not in caplog.text and NOISE not in caplog.text
     assert capsys.readouterr().err == ''
-
-
-@pytest.mark.skipif(not LOGGING_DYNAMODELS, reason='dynamodels without set_verbose')
-def test_one_handler_with_dynamodels_set_verbose():
-    romda.set_verbose(True)
-    dynamodels.set_verbose(True)
-    handlers = logging.getLogger('dynamodels').handlers
-    assert sum(h.get_name() == 'dynamodels.verbose' for h in handlers) == 1
 
 
 @pytest.mark.skipif(not LOGGING_ESN, reason='echostatenetwork without set_verbose')

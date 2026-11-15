@@ -6,10 +6,10 @@ notebook under development — the test runner skips it.
 
 Two arcs run through the topics: DA concepts (1) applied to physical models (2),
 and reduced-order-model concepts (3) combined with DA in real time (4). Read the topics in
-order. Each topic has a companion in [`examples/`](../examples/README.md), which runs the same
-experiments from the command line: [`lorenz/`](../examples/lorenz/README.md) for topic 1,
-[`thermoacoustics/`](../examples/thermoacoustics/README.md) for topic 2 and
-[`rom_da/cylinder/`](../examples/rom_da/cylinder/README.md) for topics 3 and 4.
+order. Each topic has a companion in [`scripts/`](../scripts/README.md), which runs the same
+experiments from the command line: [`lorenz/`](../scripts/examples/lorenz/README.md) for topic 1,
+[`thermoacoustics/`](../scripts/thermoacoustics/README.md) for topic 2 and
+[`podesn_cylinder/`](../scripts/podesn_cylinder/README.md) for topics 3 and 4.
 
 ### Repo-specific tutorials [0x]
 - [x] 00 - Class Model
@@ -27,6 +27,7 @@ experiments from the command line: [`lorenz/`](../examples/lorenz/README.md) for
 * [x] 13 - Augmented formulation: combined state and parameter estimation
 * [x] 15 - Chaos and DA: twin experiment on the Lorenz63
 * [x] 16 - Model bias and DA: bias-aware DA with a twin experiment on the Van der Pol model
+* [x] 17 - Bimodal posterior: Lorenz63 observed through z alone, and the Gaussian-mixture ensemble filter
 
 ***
 

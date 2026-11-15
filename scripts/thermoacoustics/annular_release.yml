@@ -1,0 +1,62 @@
+# The release setting of the annular case: tutorials/32_DA_annular_raw.ipynb of the release v1.0, the code
+# of Novoa et al. (2024).
+# It differs from the paper where the release code does (annular.yml holds the paper's settings):
+# equivalence ratio 0.5375 (cell 3), assimilation over 15 t_CR, i.e. t = 0.5-0.65 s (cell 3), analyses every
+# 35 time steps, 20 members and the parameter ranges below (cell 7), the network of cell 10, trained on the
+# record after the assimilation, an observation-error factor of 0.05 on each microphone and the
+# regularization factors 0 and 1 (cell 15), and the inflation 1.002 of its ensemble defaults
+# (physical_models.Model.defaults_ens). The model is integrated with scipy's RK45 at its default tolerances,
+# as in the release.
+name: annular_release
+
+truth:
+  model: Annular
+  ER: 0.5375                    # v1.0 tutorial 32 (data at 0.4875 + k*0.025)
+  t_stop_cr: 15                 # v1.0 tutorial 32: t_stop = t_transient + 15 t_CR
+  Nt_obs: 35
+  add_noise: false
+
+forecast:
+  kind: physical                # low-order annular model vs experimental data
+
+da:
+  method: rBA_EnKF              # EnKF | rBA_EnKF
+  std_obs: 0.05                 # Cdd = std_obs * max|d|^2 on each microphone, as in v1.0 (DA.dataAssimilation)
+  bias_regularization: 1.       # rBA-EnKF bias weight (0: bias-aware, not regularized); v1.0 tutorial 32: 0 and 1
+  m: 20
+  std_phi: 0.3
+  spinup_cr: 1                  # initial state: the default model after one t_CR (v1.0, create_ensemble)
+  std_alpha: &alpha0            # initial parameter ranges (uniform)
+    nu: [-15., 30.]
+    c2beta: [10., 50.]
+    kappa: [1.0e-4, 2.0e-4]
+    epsilon: [5.0e-3, 8.0e-3]
+    omega: !hz [1090, 1095]       # angular frequency 2 pi f, f in Hz
+    theta_b: [0.5, 0.7]
+    theta_e: [0.4, 0.6]
+  distribution_alpha: uniform
+  inflation: 1.002              # v1.0: Model.defaults_ens (inflation and reject_inflation), printed in tutorial 32
+
+bias:                           # ESN bias estimator (rBA_EnKF only)
+  upsample: 5
+  N_units: 50
+  N_wash: 10
+  augment_data: true
+  biased_observations: true
+  correlation_based_training: true
+  N_folds: 4
+  N_grid: 4                     # v1.0 EchoStateNetwork defaults: a 4 x 4 grid and 4 Bayesian evaluations,
+  N_func_evals: 20              # and no noise on the training input
+  noise: 1.0e-10
+  centre_input: false           # v1.0 scales the input by its range only
+  validation_metric: log_nMSE   # the metric of the search in v1.0
+  training_record: end          # v1.0: the last 0.207 s before t_max = t_stop + t_transient (after the window)
+  lag_criterion: correlation
+  keep_fixed_points: 0.2        # training runs at the fixed point: a fifth is kept (v1.0)
+  L: 50
+  std_alpha: *alpha0
+  rho_range: [0.5, 1.]
+  sigma_in_range: [-5., 1.]     # log10(1e-5), log10(1e1)
+  tikh_range: [1.0e-12, 1.0e-9]
+
+regularization_factors: [0., 1.]   # v1.0 tutorial 32, cell 15

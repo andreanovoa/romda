@@ -77,7 +77,11 @@ class Bias:
 
         # ================== Setup dimensions ================= ##
 
-        self.precision_t = int(-np.log10(dt)) + 2
+        # As dynamodels Model.dt: keep the decimals that dt itself needs (1/51200 = 1.953125e-5 needs 11),
+        # up to 12; rounding to 2 extra digits made that step 2e-5 and the bias clock drift from the model's.
+        self.precision_t = int(np.ceil(-np.log10(dt) + 2))
+        while self.precision_t < 12 and not np.isclose(round(dt, self.precision_t), dt, rtol=1e-12, atol=0):
+            self.precision_t += 1
         self.dt = np.round(dt, self.precision_t)
         self._b0 = np.asarray(innovation, dtype=float)
         self.Nq = self._format_state(innovation).shape[1]
@@ -356,7 +360,6 @@ class Bias:
 
         lbls =( [f'inn_{ii}' for ii in range(inn.shape[1])],
               [f'b_{ii}' for ii in range(b.shape[1])])
-        ttls = ['Innovations', 'Bias']
 
 
         t_mid = len(t) - len(t)//8
@@ -367,10 +370,9 @@ class Bias:
         cols = categorical_cmap(nc=2, nsc=nens)
         cols = [cols[ii * nens:(ii + 1) * nens] for ii in range(2)]
         # Plot the time evolution of the observables
-        for y, lbl, ttl, cs in zip([inn, b], lbls, ttls, cols):
+        for y, lbl, cs in zip([inn, b], lbls, cols):
 
             fig = plt.figure(figsize=(8, Nq+1), layout="constrained")
-            plt.suptitle(f'{ttl} time evolution')
 
             axs = fig.subplots(Nq, 2, sharey='row', sharex='col')
             if self.Nq == 1:

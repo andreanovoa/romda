@@ -1,0 +1,53 @@
+# ESN-DA twin experiment: reduced Lorenz-96 (Nx = 10) at the default F = 8.
+# Values mirror dev/ESN-DA/defaults.LORENZ96_SMALL exactly.
+name: lorenz96_small
+truth:
+  model: Lorenz96
+  params:
+    Nx: 10
+    dt: 0.01
+  noise_level: 0.02
+  num_lyap_times: 620
+  split_lyap: [10, 400, 2, 5]   # the record of L96-10p (lorenz96_parallel.yml with Nx = 10), 2026-11-13: the single
+                              # and the parallel ESN of ten sites differ only in the layout (200 T_lambda before)
+forecast:
+  kind: esn
+  esn:
+    N_units: 500             # 13 Nov 2026: as one reservoir of L96-10p and the single parametric network (1000 before)
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 5                 # the search of the parallel networks (lorenz96_parallel.yml), 2026-11-13
+    N_func_evals: 40
+    grid_midpoints: true      # initial grid off the boundary
+    bho_noise: gaussian        # the validation score is noisy
+    stability_steps: 2100     # 50 T_lambda closed loop per candidate: the stability gate
+    stability_starts: 10      # from 10 washouts spread over the record, as lorenz96_parallel.yml
+    stability_penalty: 10.0
+    rho_range: [0.2, 1.2]     # the ranges of lorenz96_parallel.yml (2026-11-13): the former search selected
+    tikh_range: [1.0e-4, 1.0e-6, 1.0e-7, 1.0e-9, 1.0e-10]   # rho = 0.41 near its bound 0.4 and the smallest Tikhonov
+    sigma_in_range: [-1.5, 1.0]   # factor, 1e-12, whose readout (norm 8.6e5) the LETKF fails on
+    noise: 0.0                # no added training noise: the record already carries the 2% noise of truth.noise_level,
+                              # as for the parallel networks (lorenz96_parallel.yml)
+    seed: 0
+    Win_type: sparse_dense_bias   # every unit sees the input bias; b_in = mean |u_norm| (Racca & Magri)
+    bias_in: 0.152
+da:
+  seed: 0
+  n_measured: 10
+  ring: true          # Lorenz-96 sites are cyclic: spread sensors on a ring (site Nx IS site 0)
+  bayesian_update: true
+  da_method: EnSRKF
+  m: 64
+  Nt_obs: 8           # ~1/8 Lyapunov time between observations
+  std_obs: 0.1        # assumed Cdd only — deployment tuning, data noise untouched
+  inflation: innovation      # the innovation-based inflation of the paper (Sect. 3.3)
+  inflation_guard: true       # lambda~ = 1 while the forecast variance at the sensors exceeds tr C_dd
+  inflation_average: plain    # a running mean of lambda~, clipped to [1, inflation_max^2] at every analysis
+  inflation_rate: 0.1         # its weight: about the last ten analyses
+  inflation_max: 3.0          # sqrt(lambda) <= 3
+  cdd_fraction: 0.2           # C_dd: 0.2 of the standard deviation of each observable (CDD_STD overrides it)
+  adaptive_inflation: false   # true: the factor of Evensen (2009, Sect. 15.3) at each analysis,
+                              # in place of inflation
+  inflate_parameters: true    # false: the inflation acts on the state rows only
+window_lyap: [2.0, 22.0, 4.0]

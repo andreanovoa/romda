@@ -1,0 +1,55 @@
+# ESN-DA twin experiment: Lorenz-63, network trained on the truth's own record.
+# Values mirror dev/ESN-DA/defaults.LORENZ63 exactly.
+name: lorenz63
+truth:
+  model: Lorenz63
+  noise_level: 0.05
+  num_lyap_times: 300
+  split_lyap: [10, 100, 5, 5]
+  params:
+    dt: 0.02          # truth constructor kwarg (also seeds the training trajectories)
+forecast:
+  kind: esn
+  esn:
+    N_units: 100
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 5                 # the search of the parallel networks (lorenz96_parallel.yml), 2026-11-13
+    N_func_evals: 40
+    grid_midpoints: true      # initial grid off the boundary
+    bho_noise: gaussian        # the validation score is noisy
+    stability_steps: 1350     # 50 T_lambda closed loop per candidate: the stability gate
+    stability_starts: 10      # from 10 washouts spread over the record, as lorenz96_parallel.yml
+    stability_penalty: 10.0
+    rho_range: [0.2, 1.2]     # the ranges of lorenz96_parallel.yml (2026-11-13), the same for every network
+    tikh_range: [1.0e-4, 1.0e-6, 1.0e-7, 1.0e-9, 1.0e-10]
+    sigma_in_range: [-1.5, 1.0]
+    noise: 0.0                # no added training noise (ESNConfig defaults to 0.01): the record already carries the
+                              # 5% noise of truth.noise_level
+    seed: 0
+    # every unit sees the input bias (echostatenetwork Win_type='sparse_dense_bias'): with the sparse column only a
+    # quarter of the units do, the tanh reservoir stays nearly odd and the filter fails on some reservoir seeds;
+    # bias_in = mean |u_norm| of the training record (0.16, Racca & Magri's code), not 0.1
+    Win_type: sparse_dense_bias
+    bias_in: 0.16
+da:
+  seed: 0
+  n_measured: 3       # a COUNT, not indices: 3 = full observability
+  bayesian_update: true
+  measured: null      # `case_dimensions` axes: digit string ('02') + CASE_KWARGS key;
+  case: null          # when set they take precedence over n_measured/bayesian_update
+  da_method: EnSRKF
+  m: 20
+  Nt_obs: 10
+  std_obs: 0.1
+  inflation: innovation      # the innovation-based inflation of the paper (Sect. 3.3)
+  inflation_guard: true       # lambda~ = 1 while the forecast variance at the sensors exceeds tr C_dd
+  inflation_average: plain    # a running mean of lambda~, clipped to [1, inflation_max^2] at every analysis
+  inflation_rate: 0.1         # its weight: about the last ten analyses
+  inflation_max: 3.0          # sqrt(lambda) <= 3
+  cdd_fraction: 0.2           # C_dd: 0.2 of the standard deviation of each observable (CDD_STD overrides it)
+  adaptive_inflation: false   # true: the factor of Evensen (2009, Sect. 15.3) at each analysis,
+                              # in place of inflation
+  inflate_parameters: true    # false: the inflation acts on the state rows only
+window_lyap: [2.0, 22.0, 4.0]   # start assimilation / stop assimilation / stop forecast

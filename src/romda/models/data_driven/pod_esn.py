@@ -7,11 +7,11 @@ from .latent_rom import LatentROM
 from .rnns import ESN_model
 
 
-def synthetic_field(N_t=200, Nx=16, Ny=8, seed=0):
+def synthetic_field(N_t=200, Nx=16, Ny=8, noise=0.02, seed=0):
     """Two travelling-wave snapshot fields, ``(2, N_t, Nx, Ny)`` — the shape
     convention `Projector.fit` expects — low-rank enough that a handful of latent
-    modes reconstructs them almost exactly. For demos and self-checks (same
-    construction as ``tests/test_pod_spod.py``); real cases load actual snapshots."""
+    modes reconstructs them almost exactly, plus Gaussian `noise` that keeps the data
+    full-rank. For demos and self-checks; real cases load actual snapshots."""
     rng = np.random.default_rng(seed)
     t = np.linspace(0, 8 * np.pi, N_t)
     x = np.linspace(0, 2 * np.pi, Nx)
@@ -21,8 +21,8 @@ def synthetic_field(N_t=200, Nx=16, Ny=8, seed=0):
     u = (np.sin(X)[None] * np.cos(t)[:, None, None]
          + 0.5 * np.sin(2 * X + Y)[None] * np.sin(2 * t)[:, None, None])
     v = np.cos(X + Y)[None] * np.sin(t)[:, None, None]
-    u = u + 0.02 * rng.standard_normal(u.shape)  # keep the data full-rank
-    v = v + 0.02 * rng.standard_normal(v.shape)
+    u = u + noise * rng.standard_normal(u.shape)
+    v = v + noise * rng.standard_normal(v.shape)
     return np.array([u, v])  # (2, N_t, Nx, Ny)
 
 

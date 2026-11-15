@@ -45,6 +45,7 @@ __all__ = [
     "list_saved_configs",
     "load_model_from_config",
     "save_model_to_config",
+    "training_data_name",
 ]
 
 #: Default store, ``results/model_configs`` in the project (next to the ESN store).
@@ -56,6 +57,18 @@ except FileNotFoundError:  # imported from outside a project tree
 M = TypeVar("M", bound=Configurable)
 CONFIG_FILE = "model_config.yaml"
 TRAINED_FILE = "trained_matrices.npz"
+
+
+def training_data_name(filename: str | Path | None) -> str | None:
+    """The name of the training data, the part of its path that every clone shares.
+
+    Args:
+      filename: The name or path of the training-data file, or `None`.
+
+    Returns:
+      The last component of `filename`, or `None`.
+    """
+    return None if filename is None else Path(filename).name
 #: Digits floats are rounded to before hashing.
 _FLOAT_DIGITS = 12
 
@@ -68,7 +81,8 @@ class ModelConfig:
       model_class: Import path of the model class, `module:QualifiedName`.
       options: Constructor options, as `Configurable.config_options` reports
         them.
-      training_data_filename: Name of the data the model was trained on.
+      training_data_filename: Name or path of the data the model was trained on;
+        the hash keeps only its name (`training_data_name`).
     """
 
     model_class: str
@@ -124,12 +138,14 @@ class ModelConfig:
         """Hashes the configuration.
 
         Floats are rounded to 12 decimals (12 significant digits where that
-        would zero them) and tuples compared as lists.
+        would zero them), tuples compared as lists, and the training data keyed by
+        its name, so that a path gives the same hash in every clone.
 
         Returns:
           The first 16 hexadecimal digits of the SHA-256 digest.
         """
-        text = json.dumps(_canonical(asdict(self)), sort_keys=True)
+        params = asdict(self) | {"training_data_filename": training_data_name(self.training_data_filename)}
+        text = json.dumps(_canonical(params), sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
     # ── Models ────────────────────────────────────────────────────────────────

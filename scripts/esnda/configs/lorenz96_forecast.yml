@@ -1,0 +1,27 @@
+# Section-3 forecasting demo: the tutorial's own (bigger) Lorenz-96 network (Nx = 40).
+# No `da` block — notebook 34 is pure ESN forecasting.
+name: lorenz96_forecast
+truth:
+  model: Lorenz96
+  noise_level: 0.005
+  num_lyap_times: 400
+  split_lyap: [10, 200, 2, 5]
+forecast:
+  kind: esn
+  esn:
+    N_units: 1000
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 4
+    N_func_evals: 30
+    grid_midpoints: true      # initial grid off the boundary
+    bho_noise: gaussian        # the validation score is noisy
+    stability_steps: 2100     # 50 T_lambda closed loop per candidate: the stability gate
+    rho_range: [0.4, 1.2]
+    tikh_range: [1.0e-6, 1.0e-9, 1.0e-10, 1.0e-12]
+    sigma_in_range: [-3, 0.477]
+    noise: 0.0                # no added training noise: the record already carries the noise of truth.noise_level
+    seed: 0
+    Win_type: sparse_dense_bias   # every unit sees the input bias; b_in = mean |u_norm| (Racca & Magri)
+    bias_in: 0.152

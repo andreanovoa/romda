@@ -30,10 +30,12 @@ class Observations:
         Source of the truth: a model instance/class to integrate, a filename to
         load, or ``None`` to provide ``y_true``/``y_raw``/``t_true`` directly.
     **kwargs
-        Time windows (``t_start``, ``t_stop``, ``t_max``, ``t_min``), sampling
+        Time windows (``t_start``, ``t_stop``, ``t_max``, ``t_min``; a record loaded from a
+        file is cut to ``[t_min, t_max)``), sampling
         (``Nt_obs``), noise options (``add_noise``, ``noise_level``, ``noise_type``),
-        bias options (``manual_bias``: ``'linear'``, ``'periodic'``, ``'time'``,
-        ``'cosine'`` or a callable ``f(y, t) -> (b, name)``), and model parameters.
+        bias options (``manual_bias``: ``'linear'``, ``'linear_offset'``, ``'periodic'``,
+        ``'time'``, ``'cosine'``, ``'cosine_squared'`` or a callable ``f(y, t) -> (b, name)``),
+        and model parameters.
 
     Attributes
     ----------
@@ -216,7 +218,11 @@ class Observations:
         - ``'periodic'``: $\vect{b}^t = 0.2\,\vect{y}^t_{\max} \cos\!\big(2\vect{y}^t / \vect{y}^t_{\max}\big)$,
           where $\vect{y}^t_{\max}$ is the time-wise maximum of `y_true`.
         - ``'linear'``: $\vect{b}^t = 0.1\,\vect{y}^t_{\max} + 0.3\,\vect{y}^t$.
+        - ``'linear_offset'``: $\vect{b}^t = 0.3\,\vect{y}^t_{\max} + 0.3\,\vect{y}^t$, the linear
+          bias with a three times larger offset.
         - ``'cosine'``: $\vect{b}^t = \cos(\vect{y}^t)$.
+        - ``'cosine_squared'``: $\vect{b}^t = 0.3\,\vect{y}^t_{\max}
+          \big(\cos\!\big((\vect{y}^t / \vect{y}^t_{\max})^2\big) + 1\big)$.
         - a callable ``f(y_true, t_true) -> (b_true, name)`` for a user-defined bias.
 
         Updates `y_true` in place (adds the bias) and sets `b_true` and `name_bias`.
@@ -248,10 +254,15 @@ class Observations:
                 b_true = 0.2 * y_max_over_time * np.cos(2 * y_true / max_safe)
             elif manual_bias == 'linear':
                 b_true = .1 * y_max_over_time + .3 * y_true
+            elif manual_bias == 'linear_offset':
+                b_true = .3 * y_max_over_time + .3 * y_true
             elif manual_bias == 'cosine':
                 b_true = np.cos(y_true)
+            elif manual_bias == 'cosine_squared':
+                b_true = .3 * y_max_over_time * (np.cos((y_true / y_max_over_time) ** 2) + 1)
             else:
-                raise ValueError(f"Bias '{manual_bias}' not recognized. Choose [linear, periodic, time, cosine].")
+                raise ValueError(f"Bias '{manual_bias}' not recognized. Choose "
+                                 f"[linear, linear_offset, periodic, time, cosine, cosine_squared].")
         else:
             logger.debug('Applying user-defined manual bias')
             # The manual bias is a function of state and/or time
@@ -415,6 +426,16 @@ class Observations:
                     raise FileNotFoundError
             except FileNotFoundError:
                 raise FileNotFoundError(f'File {model} not defined in folder {self.results_folder}.')
+
+            # Keep the record between t_min and t_max, as for a model: the data after t_max are not part of
+            # the experiment (the bias estimators train on the last steps of the record, and the raw
+            # annular data drift over their 120 s).
+            t_true = np.squeeze(t_true)
+            i0 = int(np.argmin(abs(t_true - self.t_min)))
+            i1 = len(t_true) if self.t_max is None else int(np.argmin(abs(t_true - self.t_max)))
+            t_true, y_true = t_true[i0:i1].copy(), y_true[i0:i1].copy()     # copies: the full record is released
+            if y_raw is not None:
+                y_raw = y_raw[i0:i1].copy()
 
             name_truth = 'Truth_Exp_' + model.split('/')[-1]
 
@@ -669,3 +690,44 @@ def observation_covariance(truth, std_obs=0.05):
     this is the corrected variant the ESN-DA experiments pass to
     `run_da_loop(Cdd=...)` instead."""
     return np.diag((std_obs * np.max(np.abs(truth.y_obs), axis=0)) ** 2)
+
+
+def std_fraction_covariance(y, fraction=0.2, idx=None, identical=False):
+    """Diagonal `Cdd` with the standard deviation `fraction` times that of the record `y` (time along the first axis):
+    of each observed component (``identical=False``), or of every component of `y` together, which gives identical
+    entries (``identical=True``, for the sites of a homogeneous system such as the Lorenz-96 ring). Unlike
+    `observation_covariance`, it is fixed for the record, not scaled by the observations of the window.
+
+    Parameters
+    ----------
+    y : ndarray, shape (Nt, N, ...)
+        The record.
+    fraction : float
+        Standard deviation of the observation error, as a fraction of that of the record (the washout-free ESN-DA
+        paper: 0.2).
+    idx : sequence of int, optional
+        The observed components of `y` (default all).
+    identical : bool
+        One standard deviation over every component of `y`, also the unobserved ones.
+
+    Returns
+    -------
+    ndarray, shape (len(idx), len(idx))
+    """
+    y = np.asarray(y, dtype=float).reshape(len(y), -1)
+    n = y.shape[1] if idx is None else len(idx)
+    std = np.full(n, y.std()) if identical else (y if idx is None else y[:, idx]).std(axis=0)
+    return np.diag((fraction * std) ** 2)
+
+
+def variance_fraction_covariance(truth, fraction=0.1, identical=False):
+    """Diagonal `Cdd` with the variance ``fraction * max|d|^2``, the convention of Nóvoa et al. (2024).
+
+    The maximum is taken over the observations of the window: of each observable (``identical=False``, the
+    v1.0 code and the default of `run_da_loop`), or of all the observables, which gives identical entries
+    (``identical=True``, as the paper writes it). `fraction` is a fraction of a variance: 0.1 is a standard
+    deviation of 32 % of the largest observation."""
+    largest = np.max(np.abs(truth.y_obs), axis=0)
+    if identical:
+        largest = np.full_like(largest, np.max(largest))
+    return np.diag(fraction * largest ** 2)

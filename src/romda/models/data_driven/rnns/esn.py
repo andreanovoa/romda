@@ -6,10 +6,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as sla
 from dynamodels import DiscreteIntegrator, Model
+from dynamodels.history import HistoryTracker
 from echostatenetwork import EchoStateNetwork
 from romda.utils import mean_vector_to_ensemble
 
 logger = logging.getLogger(__name__)
+
+
+def log_nMSE(case, Y_true, Y_pred, norm=None):
+    """Validation metric of the v1.0 code (and of Nóvoa et al. 2024): log10 of the mean square error over the
+    mean square of the input range of the network, `case.norm`; a diverged forecast scores 10. `norm` is the
+    range of the validated series, which the metric does not employ."""
+    error = np.log10(float(np.mean((Y_pred - Y_true) ** 2)) / float(np.mean(case.norm ** 2)))
+    return float(error) if np.isfinite(error) else 10.
+
+
+#: Validation metrics that a configuration names (`ESN_model(validation_metric='log_nMSE')`)
+VALIDATION_METRICS = {'log_nMSE': log_nMSE}
 
 
 def phi_to_esn_layout(Z):
@@ -20,6 +33,7 @@ def phi_to_esn_layout(Z):
     if Z.ndim == 2:
         Z = Z[np.newaxis, ...]  # (1, N_latent, N_t)
     return Z.transpose(0, 2, 1)  # (L, N_t, N_latent)
+
 
 
 class ESN_model(EchoStateNetwork, Model):
@@ -48,6 +62,10 @@ class ESN_model(EchoStateNetwork, Model):
         - ``y0`` : np.ndarray, initial state, used only if ``data`` is not given.
         - ``plot_training`` : bool, whether to plot the training data and
           convergence. Default True.
+        - ``history_capacity`` : int, the time steps that the history reserves after
+          every reset (the ``initial_capacity`` of dynamodels' `HistoryTracker`); it
+          grows by doubling. Default 16: the state holds the reservoir, so the 1000
+          steps of dynamodels' default reserve gigabytes for a large ensemble.
         - ESN hyperparameters (``N_units``, ``N_wash``, ``rho_range``, ...) and
           `Model` options.
 
@@ -70,12 +88,16 @@ class ESN_model(EchoStateNetwork, Model):
     - ``'sigma_in'``, ``'rho'``: the input scaling and the spectral radius; each member steps with
       its own value, and the nominal attributes are restored after every forecast.
 
-    `tests/test_esn_readout_options.py` checks each option.
+    `tests/test_esn.py` checks each option.
     """
 
     update_reservoir = True
     update_state = True
     training_data_filename = None # Filename of the data used for training (for config saving/loading only, not used in the actual training)
+    # False: the input is divided by its range only, as Eq. (4.1) of Nóvoa et al. (2024) and the v1.0 code;
+    # True (echostatenetwork): its mean over the training data is subtracted first.
+    centre_input = True
+    validation_metric_name = None   # the name of `validation_metric`, which the store of trained networks hashes
 
     Wout_svd = False
     # True: the augmented state carries log(svd_i), so members stay positive; with 'Wout' in est_alpha, a float
@@ -121,6 +143,7 @@ class ESN_model(EchoStateNetwork, Model):
         data = kwargs.pop('data', None)
         y0 = kwargs.pop('y0', None)
         plot_training = kwargs.pop('plot_training', True)
+        history_capacity = int(kwargs.pop('history_capacity', 16))   # time steps reserved by the history
 
         # =================== STEP 0: ESTIMABLE INPUT PARAMETERS ======================
         # A parametric ESN is conditioned on a physical parameter vector that is
@@ -206,6 +229,12 @@ class ESN_model(EchoStateNetwork, Model):
                        psi0=psi0,
                        integrator_class=DiscreteIntegrator,
                        **{key: val for key, val in kwargs.items() if key not in train_args})
+        # the history reserves history_capacity time steps after every reset (init_ensemble too) and grows by doubling:
+        # a state holds the reservoir, and the 1000 steps of dynamodels' default are 7.8 GB for 6000 units and 160
+        # members before the first forecast step. Copies and ensembles keep the capacity of the tracker.
+        history = HistoryTracker(initial_capacity=history_capacity)
+        history.update_history(self.history.hist, t=self.history.hist_t, reset=True)
+        self.history = history
 
         if self.param_names:
             # `Model.alpha_labels` defaults to a label->name mapping, so plotting an
@@ -217,6 +246,34 @@ class ESN_model(EchoStateNetwork, Model):
     def t_transient(self):
         """float: Total time spanning training + validation + test, ``t_train + t_val + t_test``."""
         return self.t_train + self.t_val + self.t_test
+
+    @property
+    def validation_metric(self):
+        """The metric of the hyperparameter search, ``metric(case, Y_true, Y_pred, norm) -> float``; None is the
+        default of each validation strategy of echostatenetwork (the logarithm of the normalized mean absolute
+        error). Set it to a function, or to a name in `VALIDATION_METRICS` (``'log_nMSE'``), which a
+        configuration file can hold and the store of trained networks hashes (`validation_metric_name`)."""
+        return self.__dict__.get('_validation_metric')
+
+    @validation_metric.setter
+    def validation_metric(self, metric):
+        if isinstance(metric, str):
+            if metric not in VALIDATION_METRICS:
+                raise ValueError(f'validation_metric={metric!r}: expected a function or one of '
+                                 f'{sorted(VALIDATION_METRICS)}.')
+            self.validation_metric_name, metric = metric, VALIDATION_METRICS[metric]
+        else:
+            self.validation_metric_name = None if metric is None else getattr(metric, '__name__', repr(metric))
+        self._validation_metric = metric
+
+    def _split_and_format_data(self, data=None, add_noise=True):
+        """As `EchoStateNetwork._split_and_format_data`; without `centre_input`, the shift of the input, which
+        echostatenetwork sets to the mean of the training data, is zero, so that the input is scaled by its
+        range only."""
+        out = super()._split_and_format_data(data, add_noise=add_noise)
+        if not self.centre_input:
+            self.shift = np.zeros_like(self.shift)
+        return out
 
     def _process_initialization_data(self, data, dt, kwargs) -> np.ndarray:
         """Reshape `data` to ``(L, Nt, N_dim)`` and infer `t_train`/`t_val`/`t_test`
@@ -400,6 +457,8 @@ class ESN_model(EchoStateNetwork, Model):
                 # estimates every parameter in the dict; an explicit est_alpha is
                 # honored (the dict may carry spreads for more parameters)
                 est_alpha = sorted(std_alpha)
+            if 'Wout' in est_alpha or 'Wdir' in est_alpha:
+                self._check_readout_corrections('Wout_svd' if 'Wout' in est_alpha else 'Wout_dirs')
             if 'Wout' in est_alpha:
                 svd_names = [f'svd_{qi}' for qi in range(self.N_dim)]
                 est_alpha = [a for a in est_alpha if a != 'Wout'] + svd_names
@@ -414,7 +473,7 @@ class ESN_model(EchoStateNetwork, Model):
             if regimes is None:
                 phi, alpha = self.initialize_from_val_data(N_ens=m), {}
             else:
-                phi, values = self._regime_matched_init(m, np.atleast_2d(regimes), seed=0 if seed is None else seed)
+                phi, values = self.regime_matched_states(m, np.atleast_2d(regimes), seed=0 if seed is None else seed)
                 alpha = dict(zip(self.param_names, values))
 
             if dir_names:
@@ -437,6 +496,11 @@ class ESN_model(EchoStateNetwork, Model):
 
             ensemble_psi0 = phi if not est_alpha else np.concatenate(
                 [phi, np.stack([alpha[name] for name in est_alpha])], axis=0)
+            if isinstance(std_alpha, dict):
+                # The parameter rows above follow est_alpha. `Model.init_ensemble` replaces est_alpha by the
+                # sorted keys of a std_alpha dict, which would name the rows of an explicit est_alpha in
+                # another order (or with the keys that are not estimated); the ranges are already drawn.
+                std_alpha = 0.
 
         out = super().init_ensemble(m=m, est_alpha=est_alpha, std_alpha=std_alpha,
                                     distribution_alpha=distribution_alpha,
@@ -456,31 +520,26 @@ class ESN_model(EchoStateNetwork, Model):
                 self._M = self.M[[obs.index(k) for k in idx]]
         return out
 
-    def _regime_matched_init(self, m, regimes, seed=0):
-        """Wash out member `i` on training segment `i % L`, conditioned on that
-        segment's own parameters. Returns the `(Nphi, m)` state and `(N_param, m)`
-        parameters."""
+    def regime_matched_states(self, m, regimes, seed=0):
+        """Wash out member `i` on a random window of validation segment `i % L`, conditioned on that segment's own
+        parameters (`open_loop` from r = 0). Returns the `(Nphi, m)` state and the `(N_param, m)` parameters."""
         data = self.validation_data                         # (L, Nt, N_dim)
         rng = np.random.default_rng(seed)
         segments = np.arange(m) % data.shape[0]
 
         u = np.empty((self.N_dim, m))
         r = np.empty((self.N_r, m))
-        original = self.input_parameters
-        try:
-            for i, j in enumerate(segments):
-                self.input_parameters = regimes[:, j:j + 1]
-                k0 = rng.integers(0, data.shape[1] - self.N_wash)
-                u_i, r_i = np.zeros((self.N_dim, 1)), np.zeros((self.N_r, 1))
-                for u_in in data[j, k0:k0 + self.N_wash]:
-                    u_i, r_i = self.step(self.outputs_to_inputs(u_in[:, np.newaxis]), r_i)
-                u[:, i], r[:, i] = u_i[:, 0], r_i[:, 0]
-        finally:
-            self.input_parameters = original
-
+        for i, j in enumerate(segments):
+            k0 = rng.integers(0, data.shape[1] - self.N_wash)
+            Y, R = self.open_loop(data[j, k0:k0 + self.N_wash], input_parameters=regimes[:, j:j + 1])
+            u[:, i], r[:, i] = Y[-1], R[-1]
         return self.build_psi(u=u, r=r), regimes[:, segments]
 
-    def initialize_from_val_data(self, N_ens=1, seed=0):
+    def _regime_matched_init(self, m, regimes, seed=0):
+        """Alias of `regime_matched_states` (the name of earlier versions)."""
+        return self.regime_matched_states(m, regimes, seed=seed)
+
+    def initialize_from_val_data(self, N_ens=1, seed=0, segments=None, input_parameters=None):
         """Initialize the ESN state (physical output and reservoir) from an
         open-loop washout over a random time window of `validation_data`, so a fresh
         ensemble starts from an on-attractor reservoir state rather than zeros.
@@ -492,6 +551,13 @@ class ESN_model(EchoStateNetwork, Model):
         seed : int
             Random seed for selecting the washout windows. Overridden by `self.seed`
             if set.
+        segments : list of int, optional
+            The segments of `validation_data` to draw the windows from; default all. With one segment, every
+            member washes out on it (no segment is drawn).
+        input_parameters : np.ndarray, optional
+            ``(N_param, L)`` parameters of the segments of `validation_data` (a parametric ESN): the washout on
+            segment ``l`` reads column ``l``. Default `input_parameters`, which training leaves at those of the
+            segments.
 
         Returns
         -------
@@ -506,53 +572,39 @@ class ESN_model(EchoStateNetwork, Model):
         """
         assert self.validation_data is not None
 
-        data = self.validation_data.copy()
+        data = self.validation_data
+        segments = np.arange(data.shape[0]) if segments is None else np.asarray(segments)
+        params = self.input_parameters if input_parameters is None else np.atleast_2d(input_parameters)
 
         if hasattr(self, 'seed'):
             seed = self.seed
         rng0 = np.random.default_rng(seed)
 
-
         # initialise state with a random sample from test data
         u_init, r_init = np.empty((self.N_dim, N_ens)), np.empty((self.N_r, N_ens))
 
-        # Random time windows and dimension
-        if data.shape[0] == 1:
-            dim_ids = [0] * N_ens
+        # Random time windows and segments
+        if len(segments) == 1:
+            dim_ids = [segments[0]] * N_ens
         else:
-            # Choose a random dimension from the data
-            replace = N_ens >= data.shape[0]
-            dim_ids = rng0.choice(data.shape[0], size=N_ens, replace=replace)
+            # Choose a random segment of the data
+            replace = N_ens >= len(segments)
+            dim_ids = segments[rng0.choice(len(segments), size=N_ens, replace=replace)]
 
         # Choose random time indices from the data (with replacement when there are
         # fewer washout windows than members, e.g. a short validation record)
         n_windows = data.shape[1] - self.N_wash
         t_ids = rng0.choice(n_windows, size=N_ens, replace=N_ens >= n_windows)
 
-        # validation_data is indexed by segment (dim_i matches a column of
-        # input_parameters); condition the washout of each segment on its own
-        # parameter vector, then restore the full (N_param, L) array afterwards.
-        original_input_parameters = self.input_parameters
-
+        # validation_data is indexed by segment (dim_i matches a column of the parameters); the washout of each
+        # segment reads its own parameter vector, and open_loop restores input_parameters afterwards
         for ii, ti, dim_i in zip(range(N_ens), t_ids, dim_ids):
-            u_wash = data[dim_i, ti:ti+self.N_wash]
-            r_open = np.zeros((self.N_r, 1))
-            u_open = np.zeros((self.N_dim, 1))
-            if original_input_parameters is not None:
-                self.input_parameters = original_input_parameters[:, dim_i]
-            # Open-loop reservoir
-            for u_in in u_wash:
-                u_open, r_open = self._single_step(u_in, r_open)
-
-            #store final state into the initialization arrays
-            u_init[:, ii] = u_open.squeeze()
-            r_init[:, ii] = r_open.squeeze()
-
-        self.input_parameters = original_input_parameters
+            Y, R = self.open_loop(data[dim_i, ti:ti + self.N_wash],
+                                  input_parameters=None if params is None else params[:, dim_i])
+            u_init[:, ii], r_init[:, ii] = Y[-1], R[-1]
 
         # Set physical and reservoir states as ensembles
         return self.build_psi(u=u_init, r=r_init)
-
 
     def closed_loop(self, data, n_steps, input_parameters=None):
         """Open-loop washout on `data[:N_wash]` (sampled at `dt_ESN`), then a closed-loop
@@ -560,26 +612,62 @@ class ESN_model(EchoStateNetwork, Model):
 
         The ESN maps `u_t` to `u_{t+1}`, so the *last* washout step already predicts
         `data[N_wash]` — an off-by-one here costs a full `dt_ESN` of drift."""
-        original = self.input_parameters
-        if input_parameters is not None:
-            self.input_parameters = np.asarray(input_parameters, dtype=float).reshape(-1, 1)
-
-        try:
-            r = np.zeros((self.N_r, 1))
-            u = np.zeros((self.N_dim, 1))
-            for u_in in data[:self.N_wash]:
-                u, r = self.step(self.outputs_to_inputs(np.asarray(u_in)[:, np.newaxis]), r)
-
-            pred = np.empty((n_steps, self.N_dim))
-            pred[0] = u[:, 0]
-            for i in range(1, n_steps):
-                u, r = self._single_step(u, r)
-                pred[i] = u[:, 0]
-        finally:
-            # the training-time (N_param, L) array must survive a single-regime forecast
-            self.input_parameters = original
-
+        p = None if input_parameters is None else np.asarray(input_parameters, dtype=float).reshape(-1, 1)
+        Y, R = self.open_loop(np.asarray(data[:self.N_wash]), input_parameters=p)
+        pred = np.empty((n_steps, self.N_dim))
+        pred[0] = Y[-1]
+        pred[1:] = self.forecast(Y[-1], R[-1], n_steps - 1, input_parameters=p)[0][..., 0]
         return pred, np.asarray(data[self.N_wash:self.N_wash + n_steps])
+
+    def replacement_loop(self, t_obs, y_obs, idx=None, n_extra=0, m=1):
+        """Closed loop from washouts on validation windows (`initialize_from_val_data`), with the components `idx`
+        of the output replaced by the data at each observation time: the washout spread over sparse data, or direct
+        replacement. The `m` networks start as the members of an ensemble filter do, so the two deployments see the
+        same data from the same start.
+
+        Each observation is replaced at its nearest network step: when the observation interval is not a multiple of
+        `dt_ESN`, the mismatch is at most ``dt_ESN / 2``, the rounding of `Estimator.forecast_step`.
+
+        Parameters
+        ----------
+        t_obs : (n_obs,) ndarray
+            Observation times.
+        y_obs : ndarray
+            Data, ``(n_obs, len(idx))`` or any shape with `n_obs` rows.
+        idx : list of int, optional
+            Output components that the data replace; default `observed_idx`.
+        n_extra : int
+            Closed-loop steps after the last observation.
+        m : int
+            Number of networks.
+
+        Returns
+        -------
+        t : (n,) ndarray
+            Times of the outputs, from ``t_obs[0]`` every `dt_ESN`.
+        y : ndarray
+            Output before each replacement, ``(n, N_dim)`` for ``m = 1``, else ``(n, N_dim, m)``.
+        """
+        t_obs = np.asarray(t_obs, dtype=float)
+        n_obs = len(t_obs)
+        steps = np.round((t_obs - t_obs[0]) / self.dt_ESN).astype(int)
+        assert len(np.unique(steps)) == n_obs, \
+            f'observation interval below dt_ESN {self.dt_ESN}: observations collide'
+        y_obs = np.asarray(y_obs).reshape(n_obs, -1)
+        idx = list(self.observed_idx) if idx is None else list(idx)
+        assert len(idx) == y_obs.shape[1], f'{y_obs.shape[1]} observed components, but {len(idx)} to replace'
+
+        u, r = self.unbuild_psi(self.initialize_from_val_data(N_ens=m))
+        n = steps[-1] + 1 + n_extra
+        y = np.empty((n, self.N_dim, m))
+        next_obs = 0
+        for i in range(n):
+            y[i] = u
+            if next_obs < n_obs and i == steps[next_obs]:
+                u[idx, :] = y_obs[next_obs][:, None]
+                next_obs += 1
+            u, r = self.closed_loop_step(u, r)
+        return t_obs[0] + np.arange(n) * self.dt_ESN, (y[..., 0] if m == 1 else y)
 
 
     def reset_forecaster(self, data=None, u0=None, r0=None, **kwargs):
@@ -597,7 +685,7 @@ class ESN_model(EchoStateNetwork, Model):
             Initial physical state, ``N_dim`` values or shape ``(N_dim, m)``.
             Defaults to the current physical state.
         r0 : np.ndarray, optional
-            Initial reservoir state, shape ``(N_units, m)``. Defaults to zeros,
+            Initial reservoir state, shape ``(N_r, m)``. Defaults to zeros,
             the state training starts from, so the first ~`N_wash` closed-loop
             steps are a transient; `initialize_from_val_data` gives a start on
             the attractor instead.
@@ -609,7 +697,7 @@ class ESN_model(EchoStateNetwork, Model):
             u = self.unbuild_psi(self.current_state)[0]
         else:
             u = np.asarray(u0, dtype=float).reshape(self.N_dim, -1)
-        r = np.zeros((self.N_units, u.shape[1])) if r0 is None else np.asarray(r0, dtype=float)
+        r = np.zeros((self.N_r, u.shape[1])) if r0 is None else np.asarray(r0, dtype=float)
         psi = self.build_psi(u=u, r=r)
         self.update_history(psi[np.newaxis], t=np.array([self.current_time]), reset=True)
 
@@ -621,7 +709,7 @@ class ESN_model(EchoStateNetwork, Model):
         or none when `update_reservoir` is False (they are then not part of the state)."""
         if not self.update_reservoir:
             return []
-        return [f'$r_{{{j+1}}}$' for j in np.arange(self.N_units)]
+        return [f'$r_{{{j+1}}}$' for j in np.arange(self.N_r)]
 
     @property
     def state_labels(self):
@@ -662,7 +750,7 @@ class ESN_model(EchoStateNetwork, Model):
         return self.current_state[self.N_dim:self.N_dim+self.N_r, :]
 
 
-    def reservoir_to_physical(self, r):
+    def reservoir_to_physical(self, r, u=None):
         r"""Convert reservoir states to physical outputs via `Wout` (overrides
         `EchoStateNetwork.reservoir_to_physical` to also support the SVD
         parametrization of `Wout`, see `Wout_svd`).
@@ -678,7 +766,11 @@ class ESN_model(EchoStateNetwork, Model):
         Parameters
         ----------
         r : np.ndarray
-            Reservoir state, shape ``(N_units, N_ens)``.
+            Reservoir state, shape ``(N_r, N_ens)``.
+        u : np.ndarray, optional
+            The raw input that produced `r`, ``(N_dim_in, N_ens)``, which a readout with `readout_input` also reads.
+            With ``readout_input='params'`` it defaults to the parameters of the members (`_parameter_inputs`): the
+            readout reads only the parameter rows of the input.
 
         Returns
         -------
@@ -686,8 +778,11 @@ class ESN_model(EchoStateNetwork, Model):
             Physical output, shape ``(N_dim, N_ens)``.
         """
         if not self.Wout_svd:
-            return super().reservoir_to_physical(r)   # also the parallel layout
+            if self.readout_input and u is None:
+                u = self._parameter_inputs(r)
+            return super().reservoir_to_physical(r, u=u)   # also the parallel layout
         else:
+            self._check_readout_corrections('Wout_svd')
             bias_out = self.bias_out * np.ones((1, r.shape[-1]))
             r_aug = np.concatenate((r, bias_out), axis=0)
 
@@ -702,13 +797,46 @@ class ESN_model(EchoStateNetwork, Model):
                 return np.dot(r_aug.T, Wout).T
 
 
+    def _parameter_inputs(self, r):
+        """The raw input whose parameter rows a ``readout_input='params'`` readout reads, one column per column of
+        `r` (N_r, N_ens): the estimated parameters of the members when they are in `est_alpha` and `r` holds the
+        `m` members, otherwise `input_parameters` (one column, or one per column of `r`). The state rows are zeros:
+        the readout does not read them."""
+        if self.readout_input != 'params':
+            raise ValueError('readout_input=True: the readout reads the input that produced r; pass u=.')
+        if r.ndim != 2:
+            raise ValueError('readout_input: pass u= with a history of reservoir states')
+        n = r.shape[-1]
+        if self.param_names and set(self.param_names) & set(self.est_alpha or ()) and n == getattr(self, 'm', -1):
+            alpha = self.get_alpha()
+            P = np.array([[a[name] for a in alpha] for name in self.param_names], dtype=float)
+        else:
+            P = np.atleast_2d(np.asarray(self.input_parameters, dtype=float))
+            if P.shape[1] == 1:
+                P = np.repeat(P, n, axis=1)
+            elif P.shape[1] != n:
+                raise ValueError(f'input_parameters has {P.shape[1]} columns for {n} reservoir states: set the '
+                                 'parameters of the states first, or pass u=')
+        return np.vstack([np.zeros((len(self.observed_idx), n)), P])
+
+    def _check_readout_corrections(self, option):
+        """The per-member readout corrections (`Wout_svd`, est_alpha=['Wout']; `Wout_dirs`, est_alpha=['Wdir']) act
+        on a readout of [r; 1] rows, one column per member: they are not defined with `readout_input` or the
+        parallel layout (whose readout reads one column per patch and member)."""
+        if self.readout_input or self.patch_size is not None:
+            raise ValueError(f'{option} (est_alpha Wout/Wdir) is not implemented with readout_input or the '
+                             'parallel layout (patch_size)')
+
     def _readout(self, r, u_norm):
         # `EchoStateNetwork.step` reads out through `_readout` (echostatenetwork >= 0.1.2),
         # not through `reservoir_to_physical`: without this hook the per-member SVD
         # read-out (est_alpha=['Wout']) never reaches the closed loop.
         if self.Wout_svd and 'Wout_U' in vars(self):   # not while training, before Wout has its SVD
+            self._check_readout_corrections('Wout_svd')
             return self.reservoir_to_physical(r)
         u = super()._readout(r, u_norm)
+        if self.Wout_dirs is not None and self.est_alpha and self.est_alpha[-1].startswith('wdir_'):
+            self._check_readout_corrections('Wout_dirs')
         if self.Wout_dirs is not None and self.est_alpha and self.est_alpha[-1].startswith('wdir_') \
                 and r.shape[-1] == self.m:
             k = self.Wout_dirs.shape[1]
@@ -765,7 +893,7 @@ class ESN_model(EchoStateNetwork, Model):
 
 
             for i in range(Nt):
-                u_m, r_m = self._single_step(u_m, r_m)
+                u_m, r_m = self.closed_loop_step(u_m, r_m)
                 u[i+1] = u_m + u_dev
                 r_out[i+1] = r_m + r_dev
 
@@ -778,7 +906,7 @@ class ESN_model(EchoStateNetwork, Model):
                 setattr(self, a, np.array([al[a] for al in self.get_alpha()]))
             try:
                 for i in range(Nt):
-                    u[i+1], r_out[i+1] = self._single_step(u[i], r_out[i])
+                    u[i+1], r_out[i+1] = self.closed_loop_step(u[i], r_out[i])
             finally:
                 for a, v in nominal.items():
                     setattr(self, a, v)
@@ -787,11 +915,6 @@ class ESN_model(EchoStateNetwork, Model):
         psi = self.build_psi(u=u, r=r_out)
 
         return psi, t
-
-
-    def _single_step(self, u, r):
-        u_input = self.outputs_to_inputs(full_state=u)
-        return self.step(u_input, r)
 
 
     def build_psi(self, u=None, r=None):
@@ -976,7 +1099,7 @@ class ESN_model(EchoStateNetwork, Model):
             t = self.hist_t[-len(y_hist):]
         super().visualize_spatiotemporal_hist(y_hist[:, :self.N_dim], t, **kwargs)
         if y_hist.shape[1] > self.N_dim:
-            super().visualize_spatiotemporal_hist(y_hist[:, self.N_dim:self.N_dim + self.N_units], t, **kwargs)
+            super().visualize_spatiotemporal_hist(y_hist[:, self.N_dim:self.N_dim + self.N_r], t, **kwargs)
 
     def plot_Wout(self):
         """Visualize the trained read-out matrix `Wout` (overrides

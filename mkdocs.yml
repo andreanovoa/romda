@@ -4,10 +4,10 @@ hooks:
 site_name: "Nóvoa Lab · romda"
 site_description: Real-time reduced-order modelling and bias-aware data assimilation
 site_author: Andrea Nóvoa
-site_url: https://andreanovoa.github.io/real-time-bias-aware-DA/
+site_url: https://andreanovoa.github.io/romda/
 
-repo_url: https://github.com/andreanovoa/real-time-bias-aware-DA
-repo_name: andreanovoa/real-time-bias-aware-DA
+repo_url: https://github.com/andreanovoa/romda
+repo_name: andreanovoa/romda
 
 docs_dir: docs
 
@@ -109,6 +109,7 @@ nav:
           - Augmented formulation: tutorials/1_Introduction_to_real-time_DA/13_real-time-DA-augmented-state.md
           - Chaos and DA (Lorenz 63): tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md
           - Model-bias-aware DA: tutorials/1_Introduction_to_real-time_DA/16_Bias-aware_real-time_DA.md
+          - Bimodal posterior (Gaussian mixture): tutorials/1_Introduction_to_real-time_DA/17_Gaussian_mixture_ensemble_filter.md
       - 2. Real-time DA in thermoacoustics:
           - Rijke tube — model and DA: tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md
           - TABADA Rijke (CMAME): tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md
@@ -117,4 +118,4 @@ nav:
           - POD / SPOD: tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md
           - POD-ESN on the cylinder wake: tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md
       - 4. Real-time DA on reduced-order models (on GitHub for now):
-          - Real-time DA with POD-ESN: https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb
+          - Real-time DA with POD-ESN: https://github.com/andreanovoa/romda/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb

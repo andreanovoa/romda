@@ -1,7 +1,7 @@
 # romda — real-time reduced-order modelling and bias-aware data assimilation
 
 [![PyPI](https://img.shields.io/pypi/v/romda)](https://pypi.org/project/romda/)
-[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://andreanovoa.github.io/real-time-bias-aware-DA/)
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://andreanovoa.github.io/romda/)
 
 `romda` is an open-source Python package for real-time data assimilation with
 reduced-order models: ensemble Kalman filters (including the regularized bias-aware
@@ -13,7 +13,7 @@ romda builds on three packages, which `pip` installs with it:
 [`ntsa`](https://github.com/andreanovoa/ntsa) (time-series analysis).
 
 > This repository was formerly the `real-time-DA` package. The code used in the papers listed
-> below is preserved at the release tags [v1.0](https://github.com/andreanovoa/real-time-bias-aware-DA/releases/tag/v1.0), [v1.1](https://github.com/andreanovoa/real-time-bias-aware-DA/releases/tag/v1.1) and [v2.1](https://github.com/andreanovoa/real-time-bias-aware-DA/releases/tag/v2.1).
+> below is preserved at the release tags [v1.0](https://github.com/andreanovoa/romda/releases/tag/v1.0), [v1.1](https://github.com/andreanovoa/romda/releases/tag/v1.1) and [v2.1](https://github.com/andreanovoa/romda/releases/tag/v2.1).
 
 
 ---
@@ -27,8 +27,8 @@ pip install romda
 
 or, to work on the source, clone and install in editable mode:
 ```
-git clone https://github.com/andreanovoa/real-time-bias-aware-DA
-cd real-time-bias-aware-DA
+git clone https://github.com/andreanovoa/romda
+cd romda
 conda create -n romda python=3.12 && conda activate romda
 pip install -e ".[dev,notebooks]" --use-pep517   # dev = pytest and ruff, notebooks = jupyter
 ```
@@ -36,6 +36,7 @@ pip install -e ".[dev,notebooks]" --use-pep517   # dev = pytest and ruff, notebo
 2. (Optional) **Run the test suite**
 ```
 python -m pytest tests/                 # unit and integration tests
+python -m pytest scripts/esnda  # the scripts of the washout-free ESN-DA paper
 python -m pytest tutorials/test_tutorials.py           # execute the tutorial notebooks
 ```
 
@@ -70,15 +71,15 @@ multiprocessing pool, so, in a script, keep the code under `if __name__ == "__ma
 1. **The tutorials** ([`tutorials/`](tutorials/README.md)) are numbered notebooks, topic by topic: the classes
    of the package (0), data assimilation (1), thermoacoustics (2), reduced-order models (3), and data
    assimilation with reduced-order models (4). Read them in order.
-2. **The examples** ([`examples/`](examples/README.md)) are complete experiments, one folder per topic. Each
+2. **The scripts** ([`scripts/`](scripts/README.md)) are complete experiments, one folder per topic: usage examples (`scripts/examples/`) and the code of the papers (`thermoacoustics/`, `podesn_cylinder/`, `esnda/`). Each
    case is a configuration file, with a script next to it when the case needs one; the README of each
    topic lists the papers that it supports:
 
    ```bash
-   python examples/lorenz/lorenz63.py --save-figs
-   python -m romda.experiments examples/thermoacoustics/rijke.yml --seed 1
+   python scripts/examples/lorenz/lorenz63.py --save-figs
+   python -m romda.run scripts/thermoacoustics/rijke.yml --seed 1
    ```
-3. **The documentation** ([andreanovoa.github.io/real-time-bias-aware-DA](https://andreanovoa.github.io/real-time-bias-aware-DA/))
+3. **The documentation** ([andreanovoa.github.io/romda](https://andreanovoa.github.io/romda/))
    describes the classes and their options.
 
 
@@ -127,10 +128,10 @@ multiprocessing pool, so, in a script, keep the code under `if __name__ == "__ma
 │   ├── plotting/                # figure helpers
 │   ├── observations.py          # truth and observations
 │   ├── data_assimilation.py     # run_da_loop: the sequential data-assimilation driver
-│   ├── experiments.py           # run_experiment: one YAML configuration, one experiment
+│   ├── run.py                   # run_config, run_esn_config: one YAML configuration, one run
 │   └── metrics.py, utils.py, verbose.py   # verbose.py: logging, silent unless romda.set_verbose()
 ├── tutorials/                   # numbered notebooks, topic by topic: start here
-├── examples/                    # complete experiments: lorenz/, thermoacoustics/, rom_da/cylinder/
+├── scripts/                     # complete experiments: examples/lorenz/, thermoacoustics/, podesn_cylinder/, esnda/
 ├── tests/                       # test suite (pytest)
 ├── docs/                        # documentation site, built by mkdocs.yml and hooks.py, and the figures of the notebooks
 ├── data/, results/              # downloaded datasets and cached results, not tracked by git
@@ -144,14 +145,14 @@ multiprocessing pool, so, in a script, keep the code under `if __name__ == "__ma
 
 ##### Journal papers
 
-- [x] Nóvoa, Noiray, Dawson & Magri (2024). A real-time digital twin of azimuthal thermoacoustic instabilities. Journal of Fluid Mechanics. [Published paper](https://doi.org/10.1017/jfm.2024.1052) |  🏷️ [v1.0](https://github.com/andreanovoa/real-time-bias-aware-DA/releases/tag/v1.0) | 📁 [`examples/thermoacoustics`](examples/thermoacoustics/README.md). 
-- [x] Nóvoa, Racca & Magri (2023). Inferring unknown unknowns. Computer Methods in Applied Mechanics and Engineering. [Published paper](https://doi.org/10.1016/j.cma.2023.116502) | [_Legacy_ repository](https://github.com/MagriLab/rBA-EnKF) | 📁 [`examples/thermoacoustics`](examples/thermoacoustics/README.md).
-- [x] Nóvoa & Magri (2022). Real-time thermoacoustic data assimilation. Journal of Fluid Mechanics. [Published paper](https://doi.org/10.1017/jfm.2022.653) | [_Legacy_ repository](https://github.com/MagriLab/Real-time-TA-DA) | 📁 [`examples/thermoacoustics`](examples/thermoacoustics/README.md).
+- [x] Nóvoa, Noiray, Dawson & Magri (2024). A real-time digital twin of azimuthal thermoacoustic instabilities. Journal of Fluid Mechanics. [Published paper](https://doi.org/10.1017/jfm.2024.1052) |  🏷️ [v1.0](https://github.com/andreanovoa/romda/releases/tag/v1.0) | 📁 [`scripts/thermoacoustics`](scripts/thermoacoustics/README.md). 
+- [x] Nóvoa, Racca & Magri (2023). Inferring unknown unknowns. Computer Methods in Applied Mechanics and Engineering. [Published paper](https://doi.org/10.1016/j.cma.2023.116502) | [_Legacy_ repository](https://github.com/MagriLab/rBA-EnKF) | 📁 [`scripts/thermoacoustics`](scripts/thermoacoustics/README.md).
+- [x] Nóvoa & Magri (2022). Real-time thermoacoustic data assimilation. Journal of Fluid Mechanics. [Published paper](https://doi.org/10.1017/jfm.2022.653) | [_Legacy_ repository](https://github.com/MagriLab/Real-time-TA-DA) | 📁 [`scripts/thermoacoustics`](scripts/thermoacoustics/README.md).
 
 ##### Conference papers and proceedings
-- [x] Nóvoa & Magri (2025). Online model learning with data-assimilated reservoir computers. [Preprint](https://doi.org/10.48550/arXiv.2504.16767) | 🏷️ [v1.1](https://github.com/andreanovoa/real-time-bias-aware-DA/releases/tag/v1.1) | 📁 [`examples/rom_da/cylinder`](examples/rom_da/cylinder/README.md).
+- [x] Nóvoa & Magri (2025). Online model learning with data-assimilated reservoir computers. [Preprint](https://doi.org/10.48550/arXiv.2504.16767) | 🏷️ [v1.1](https://github.com/andreanovoa/romda/releases/tag/v1.1) | 📁 [`scripts/podesn_cylinder`](scripts/podesn_cylinder/README.md).
 - [x] Nóvoa & Magri (2024). Real-time digital twins of multiphysics and turbulent flows. [Paper](https://web.stanford.edu/group/ctr/ctrsp24/ii11_NOVOA.pdf).
-- [x] Nóvoa & Magri (2022). Bias-aware thermoacoustic data assimilation. In_ 51st International Congress and Exposition on Noise Control Engineering. [Paper](https://az659834.vo.msecnd.net/eventsairwesteuprod/production-inconference-public/808b4f8c38f944d188db8a326a98c65c). | [_Legacy_ repository](https://github.com/MagriLab/IN22-Bias-aware-TADA) | 📁 [`examples/thermoacoustics`](examples/thermoacoustics/README.md).
+- [x] Nóvoa & Magri (2022). Bias-aware thermoacoustic data assimilation. In_ 51st International Congress and Exposition on Noise Control Engineering. [Paper](https://az659834.vo.msecnd.net/eventsairwesteuprod/production-inconference-public/808b4f8c38f944d188db8a326a98c65c). | [_Legacy_ repository](https://github.com/MagriLab/IN22-Bias-aware-TADA) | 📁 [`scripts/thermoacoustics`](scripts/thermoacoustics/README.md).
 
 ##### PhD thesis
 - [x] Nóvoa (2024). Real-time data assimilation in nonlinear dynamical systems. University of Cambridge. [Thesis](https://doi.org/10.17863/CAM.113001). 

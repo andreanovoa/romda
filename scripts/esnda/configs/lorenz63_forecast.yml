@@ -1,0 +1,28 @@
+# Section-3 forecasting demo: the tutorial's own (bigger) Lorenz-63 network.
+# No `da` block — notebook 33 is pure ESN forecasting.
+name: lorenz63_forecast
+truth:
+  model: Lorenz63
+  noise_level: 0.02
+  num_lyap_times: 300
+  split_lyap: [10, 100, 5, 5]
+forecast:
+  kind: esn
+  esn:
+    N_units: 300
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 4
+    N_func_evals: 30
+    grid_midpoints: true      # initial grid off the boundary
+    bho_noise: gaussian        # the validation score is noisy
+    stability_steps: 1350     # 50 T_lambda closed loop per candidate: the stability gate
+    rho_range: [0.4, 1.0]
+    tikh_range: [1.0e-6, 1.0e-9, 1.0e-10, 1.0e-12]
+    sigma_in_range: [-2, 0.477]
+    noise: 0.0                # no added training noise (ESNConfig defaults to 0.01): the record already carries the
+                              # noise of truth.noise_level
+    seed: 0
+    Win_type: sparse_dense_bias   # every unit sees the input bias, as in lorenz63.yml
+    bias_in: 0.16

@@ -34,6 +34,8 @@ AssimilatedData = namedtuple("AssimilatedData", ["data", "times"])
 
 #: The attributes that a keyword sets, with that keyword: one spelling per option.
 _STORED = {'regularization_factor': 'bias_regularization', 'inflation_factor': 'inflation'}
+_STORED['adaptive_inflation'] = "inflation='adaptive'"
+_STORED['innovation_inflation'] = "inflation='innovation'"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Abstract base — Estimator
@@ -127,6 +129,9 @@ class Estimator(ABC):
         Bias-regularization factor $\gamma$ (stored as ``regularization_factor``); requires a bias.
     inflation : float, optional
         Multiplicative inflation factor (stored as ``inflation_factor``).
+        ``'adaptive'`` estimates the factor at every analysis.
+        ``'innovation'`` (`EnsembleFilter` only) inflates the forecast by a factor estimated from
+        the bias-corrected innovation (`romda.estimators.inflation.innovation_inflation_factor`).
 
     Notes
     -----
@@ -135,6 +140,8 @@ class Estimator(ABC):
 
     ``bias_estimation`` (the bias-estimation routes) and ``localization`` are options of biasda's
     estimators and raise NotImplementedError here.
+    The exception is ``localization`` (with ``state_positions``, ``obs_positions`` and ``loc_period``),
+    the LETKF of ``EnsembleFilter(type='sqrt')``, which raises NotImplementedError for the other estimators.
 
     References
     ----------
@@ -159,6 +166,23 @@ class Estimator(ABC):
     inflation_factor: float = 1.0
     inflate_parameters: bool = True   # False: inflate the state rows only
     inflation_factor_rejection: float = 1.002
+    # Adaptive inflation (Evensen 2009, Sect. 15.3): estimate the factor at each
+    # analysis from a random ensemble pushed through the same update; overrides
+    # ``inflation_factor``. ``inflation_n_rand`` rows in the random ensemble.
+    adaptive_inflation: bool = False
+    inflation_n_rand: int = 100
+    # Innovation inflation (Li, Kalnay & Miyoshi 2009): inflate the forecast by sqrt(lambda), with
+    # lambda the running mean of the estimate from the innovation of every analysis (weight
+    # ``inflation_rate``), bounded below by one and above by ``inflation_max`` squared (None: no bound).
+    innovation_inflation: bool = False
+    inflation_rate: float = 0.1
+    inflation_max: float | None = None
+    # ``inflation_guard``: the one-sample estimate is one while the forecast variance at the sensors exceeds
+    # tr C_dd, i.e. before the ensemble synchronizes (Novoa et al., washout-free ESN-DA). ``inflation_average``:
+    # 'weighted', the ratio of the running means of lambda~ tr C_yy and tr C_yy; 'plain', the running mean of
+    # lambda~ clipped to [1, inflation_max**2] at every analysis (Li et al. 2009).
+    inflation_guard: bool = False
+    inflation_average: str = 'weighted'
     # State rejection: an analysis that moves the ensemble mean of the physical state (not the reservoir of an
     # ESN, not the parameters) by more than ``max_mean_shift`` climatological standard deviations is rejected,
     # and the forecast is kept (None: never). ``climatology``: the standard deviation of each physical state
@@ -215,9 +239,7 @@ class Estimator(ABC):
         if bias_regularization is not None:
             self.regularization_factor = bias_regularization
         if inflation in ('adaptive', 'innovation'):
-            enabled = False             # the public build has neither
-            if not enabled:
-                raise NotImplementedError(f"inflation={inflation!r} is an option of biasda's estimators; pass a fixed factor.")
+            setattr(self, f'{inflation}_inflation', True)
         elif isinstance(inflation, str):
             raise ValueError(f"inflation={inflation!r}: expected a factor, 'adaptive' or 'innovation'.")
         elif inflation is not None:

@@ -1,0 +1,70 @@
+# Bias-aware DA of raw azimuthal thermoacoustic data (python -m romda.run). The truth is experimental
+# pressure data (one file per equivalence ratio `ER`); windows derived from `Annular.t_transient` / `t_CR`
+# stay in the code (`t_stop_cr` counts observation windows of `t_CR` past the
+# transient), as do the bias-training times (`t_transient/3`, `2 t_CR`).
+#
+# The settings are those of Novoa, Noiray, Dawson & Magri (2024, J. Fluid Mech. 1001, A49): Table 2 and
+# sections 4 and 6, and Appendix C for the training data. Where the paper is silent, they follow the release
+# code v1.0, as the reproduction in biasda does (examples/jfm2024_annular, whose README lists every choice).
+# annular_release.yml holds the settings of the release code where it differs from the paper.
+name: annular_paper
+
+truth:
+  model: Annular
+  ER: 0.5125                    # the case that the paper discusses (data at 0.4875 + k*0.025)
+  t_stop_cr: 35                 # assimilation over t = 0.5-0.85 s (section 6.1)
+  Nt_obs: 30                    # 5.86e-4 s between analyses (sections 6.1 and 7; Table 2 and v1.0: 35)
+  add_noise: false
+
+forecast:
+  kind: physical                # low-order annular model vs experimental data
+
+da:
+  method: rBA_EnKF              # EnKF | rBA_EnKF
+  std_obs: 0.1                  # Cdd = 0.1 max|d|^2 I (section 3.1, Table 2)
+  Cdd_entries: identical        # one maximum for the four microphones (v1.0: per_observable)
+  bias_regularization: 5.       # rBA-EnKF bias weight (regularization_factors: those of the paper)
+  m: 20
+  std_phi: 0.3
+  spinup_cr: 1                  # initial state: the default model after one t_CR (v1.0, create_ensemble)
+  integrator: rk4               # fourth-order Runge-Kutta at the sampling interval; the default RK45 drifts
+  std_alpha: &alpha0            # initial parameter ranges (uniform), Table 2
+    nu: [-10., 30.]
+    c2beta: [10., 50.]
+    kappa: [1.0e-4, 2.0e-4]
+    epsilon: [5.0e-3, 8.0e-3]
+    omega: !hz [1090, 1095]       # angular frequency 2 pi f, f in Hz
+    theta_b: [0.5, 0.7]
+    theta_e: [0.4, 0.6]
+  distribution_alpha: uniform
+  inflation: 1.001              # Table 2, after each analysis
+  inflation_factor_rejection: 1.001   # and after a rejected one
+
+bias:                           # ESN bias estimator (rBA_EnKF only), Table 2 and Appendix C
+  upsample: 5
+  N_units: 50
+  N_wash: 10
+  washout: true                 # the network is synchronized with the data of the 10 network steps before the
+                                # first analysis, as the paper; romda's default start of the network needs none
+  augment_data: true
+  biased_observations: true
+  correlation_based_training: true
+  training_record: start        # the first 0.207 s of the record, before the assimilation (section 6.1)
+  lag_criterion: distance       # best lag: smallest distance to the data over the first t_CR (Appendix C)
+  keep_fixed_points: 0.2        # training runs at the fixed point: a fifth is kept (v1.0)
+  N_folds: 4
+  N_grid: 4                     # a 4 x 4 grid and 4 Bayesian evaluations (v1.0)
+  N_func_evals: 20
+  noise: 1.0e-10
+  centre_input: false           # the input is scaled by its range only, Eq. (4.1)
+  validation_metric: log_nMSE   # the metric of the search in v1.0
+  L: 50
+  std_alpha: *alpha0
+  rho_range: [0.5, 1.]
+  sigma_in_range: [-5., 0.]     # log10(1e-5), log10(1), Table 2
+  tikh_range: [1.0e-12, 1.0e-9]
+
+# the 12 values of v1.0 (mains/main_annular.py) and of figure 10 of the paper
+regularization_factors: [0., 0.454545, 0.909091, 1.363636, 1.818182, 2.272727, 2.727273, 3.181818, 3.636364,
+                         4.090909, 4.545455, 5.]
+

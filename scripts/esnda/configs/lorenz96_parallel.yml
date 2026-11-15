@@ -1,0 +1,59 @@
+# L96-40p: parallel ESN on the 40-site Lorenz-96 ring (Pathak et al. 2018). One reservoir of N_units units per
+# patch of patch_size sites, reading its patch and halo sites on either side; the patches share Win, W and Wout
+# (echostatenetwork parallel layout). Same record, training and validation as lorenz96_small.yml.
+name: lorenz96_parallel
+truth:
+  model: Lorenz96
+  params:
+    Nx: 40
+    dt: 0.01
+  noise_level: 0.02
+  num_lyap_times: 620
+  split_lyap: [10, 400, 2, 5]
+forecast:
+  kind: esn
+  esn:
+    N_units: 500
+    patch_size: 5
+    halo: 2
+    periodic: true
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 5                 # 5 x 5 initial grid: with 4 x 4, the two columns of small sigma_in failed the gate
+    N_func_evals: 40
+    grid_midpoints: true      # initial grid off the boundary
+    bho_noise: gaussian        # the validation score is noisy
+    stability_steps: 2100     # 50 T_lambda closed loop per candidate: the stability gate
+    stability_starts: 10      # from 10 washouts spread over the record: one start passed L96-40s at rho = 0.2,
+                              # which leaves the attractor after 1.7 T_lambda from a test window
+    stability_penalty: 10.0   # a hard rejection: at 1.0 (a tenth of a diverged probe), a candidate that fails the gate
+                              # still won with a short-term score better by more than 1 (L96-40s: -2.27 + 1 < -1.2)
+    rho_range: [0.2, 1.2]     # every search selected the former lower bound, 0.4; L96-10p forecasts as well from 0.1
+                              # to 0.4 and worse above
+    tikh_range: [1.0e-4, 1.0e-6, 1.0e-7, 1.0e-9, 1.0e-10]   # down to 1e-10: at 1e-12 the readout of L96-40s grew
+                                                         # to a norm of 1.6e7 (604 at 1e-4) for the same valid time
+    sigma_in_range: [-1.5, 1.0]   # log10: every input scaling below 0.03 failed the stability gate; L96-40s selected
+                                  # the former upper bound, 3
+    noise: 0.0                # no added training noise: the record already carries the noise of truth.noise_level
+                              # (2%); the package's input noise regularizes networks trained on clean data. With
+                              # 0.01 on top, every search selected the smallest Tikhonov factor
+    seed: 0
+    Win_type: sparse_dense_bias   # every unit sees the input bias; b_in = mean |u_norm| (Racca & Magri)
+    bias_in: 0.152
+da:
+  seed: 0
+  n_measured: 40
+  ring: true
+  bayesian_update: true
+  da_method: EnSRKF
+  m: 10
+  Nt_obs: 5
+  std_obs: 0.1
+  inflation: innovation      # the innovation-based inflation of the paper (Sect. 3.3)
+  inflation_guard: true       # lambda~ = 1 while the forecast variance at the sensors exceeds tr C_dd
+  inflation_average: plain    # a running mean of lambda~, clipped to [1, inflation_max^2] at every analysis
+  inflation_rate: 0.1         # its weight: about the last ten analyses
+  inflation_max: 3.0          # sqrt(lambda) <= 3
+  cdd_fraction: 0.2           # C_dd: 0.2 of the standard deviation of each observable (CDD_STD overrides it)
+window_lyap: [2.0, 22.0, 4.0]

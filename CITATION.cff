@@ -5,14 +5,24 @@ authors:
   - family-names: "Nóvoa"
     given-names: "Andrea"
     affiliation: "Imperial College London"
+  - family-names: "Magri"
+    given-names: "Luca"
+    affiliation: "Imperial College London"
+  - family-names: "Özalp"
+    given-names: "Elise"
+    affiliation: "Imperial College London"
+  - family-names: "Ozan"
+    given-names: "Defne"
+    affiliation: "Imperial College London"
   - family-names: "Campbell"
     given-names: "Lukas"
+    affiliation: "Imperial College London"
   - family-names: "Eze"
     given-names: "Ben"
-version: 3.2.0
+version: 4.0.0
 license: MIT
-repository-code: "https://github.com/andreanovoa/real-time-bias-aware-DA"
-url: "https://andreanovoa.github.io/real-time-bias-aware-DA/"
+repository-code: "https://github.com/andreanovoa/romda"
+url: "https://andreanovoa.github.io/romda/"
 keywords:
   - data assimilation
   - bias estimation

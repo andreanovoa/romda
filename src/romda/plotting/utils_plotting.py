@@ -32,6 +32,14 @@ class Palette:
     obs_props = dict(marker='.', linestyle='none', markersize=7, markeredgecolor='none', color=colors.to_rgba(OBS))
 
 
+def use_times_font():
+    """Set the text of matplotlib figures in Times, with STIX mathematics to match (the style of the figures of
+    the papers). Falls back on STIX and then the default serif where Times is not installed."""
+    plt.rcParams.update({'font.family': 'serif',
+                         'font.serif': ['Times New Roman', 'Times', 'STIXGeneral', 'DejaVu Serif'],
+                         'mathtext.fontset': 'stix'})
+
+
 def categorical_cmap(nc, nsc):
     """Colours, shape ``(nc * nsc, 3)``, for `nc` tab10 categories of `nsc` lightening shades each."""
     if nc > plt.get_cmap('tab10').N:

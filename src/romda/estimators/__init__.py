@@ -39,6 +39,8 @@ Estimator                       (root: configuration and bias machinery)  ->  ba
 
 Auxiliary: `romda.estimators.inflation` (multiplicative covariance inflation) and
 `romda.estimators.localization` (Gaspari-Cohn correlation functions, as in ``biasda.localization``).
+With ``localization``, ``EnsembleFilter(type='sqrt')`` is the LETKF, which tapers with these functions;
+``inflation='adaptive'`` and ``inflation='innovation'`` estimate the inflation factor.
 
 Forecast strategy
 -----------------
@@ -91,3 +93,6 @@ __all__ = [
     "KalmanFilter",
     "multiplicative_inflation",
 ]
+from romda.estimators.inflation import adaptive_inflation_factor, innovation_inflation_factor  # noqa: E402
+
+__all__ += ["adaptive_inflation_factor", "innovation_inflation_factor"]

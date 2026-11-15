@@ -14,9 +14,15 @@ $$
 where each entry of $\matr{L}$ is the Gaspari-Cohn function of the distance
 between the two components. The module mirrors ``biasda.localization``, whose
 estimators apply these matrices when configured with ``localization``.
+In romda, ``EnsembleFilter(type='sqrt', localization=...)`` is the
+local ensemble transform Kalman filter (LETKF; Hunt et al. 2007), which tapers the
+inverse of $\matr{C}_{dd}$ row by row instead (see `romda.estimators.sequential.ensemble`).
 
 References
 ----------
+Hunt, Kostelich & Szunyogh (2007). Efficient data assimilation for spatiotemporal
+chaos: a local ensemble transform Kalman filter. *Physica D*, 230, 112-126.
+
 Gaspari & Cohn (1999). Construction of correlation functions in two and three
 dimensions. *Q. J. R. Meteorol. Soc.*, 125, 723-757.
 

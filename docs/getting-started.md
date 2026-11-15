@@ -15,8 +15,8 @@ pip install romda
 For a source checkout:
 
 ```bash
-git clone https://github.com/andreanovoa/real-time-bias-aware-DA
-cd real-time-bias-aware-DA
+git clone https://github.com/andreanovoa/romda
+cd romda
 conda create -n romda python=3.12
 conda activate romda
 pip install -e ".[dev,notebooks]" --use-pep517
@@ -62,7 +62,7 @@ The complete experiments of the repository are documented on the
 [Examples](experiments.md) page:
 
 ```bash
-python -m romda.experiments examples/thermoacoustics/rijke.yml --seed 1
+python -m romda.run scripts/thermoacoustics/rijke.yml --seed 1
 ```
 
 ## Continue

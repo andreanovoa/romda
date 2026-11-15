@@ -9,7 +9,7 @@ on:
 
 jobs:
   pypi:
-    if: github.repository == 'andreanovoa/real-time-bias-aware-DA'
+    if: github.repository == 'andreanovoa/romda'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

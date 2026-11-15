@@ -1,0 +1,7 @@
+L63                 store d282ecee876a0a45: (a) max |step difference| 0.0e+00 | (c) valid time 2.22 T_lambda (store 2.22, paper 2.22)
+L96-10s             store 34de7b83fb418091: (a) max |step difference| 0.0e+00 | (c) valid time 2.71 T_lambda (store 2.71, paper 2.71)
+L96-10p             store ac2ba329e78a8537: (a) max |step difference| 0.0e+00 | (c) valid time 3.69 T_lambda (store 3.69, paper 3.69)
+L96-40s             store a73afd903a826f51: (a) max |step difference| 0.0e+00 | (c) valid time 0.72 T_lambda (store 0.72, paper 0.72)
+L96-40p             store 2253af9ee8af3e53: (a) max |step difference| 0.0e+00 | (c) valid time 3.65 T_lambda (store 3.65, paper 3.65)
+L96-10s-parametric  store 4dd78f9afa97a6d6: (a) max |step difference| 0.0e+00 | (b) param_in_reservoir False, readout_input 'params', F column of W_in zero: True | (c) valid time 4.65 T_lambda (store 4.65, paper 4.65)
+ALL CHECKS PASS

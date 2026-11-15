@@ -3,6 +3,9 @@ Created on Wed May 11 09:45:48 2022
 
 @author: Andrea Nóvoa @andrea_novoa
 """
+import functools
+import gc
+import hashlib
 import logging
 import os
 import pickle
@@ -48,7 +51,7 @@ def noise_generator(seed=0) -> np.random.Generator:
 #: The shared generator of the measurement noise: every noise draw of the observation operators
 #: (`romda.observations.Observations` and, unless given another generator, `add_noise_to_flow`)
 #: comes from it. It is seeded with 0 at import, so a script draws the same noise on every run;
-#: `seed_noise` restarts it from another seed (`romda.experiments.run_experiment` does so with the
+#: `seed_noise` restarts it from another seed (`romda.run.run_config` does so with the
 #: seed of the run).
 noise_rng = noise_generator(0)
 
@@ -176,7 +179,13 @@ def add_noise_to_flow(U, noise_level=0.05, noise_type="gauss", spatial_smooth=0.
 
 
 def get_project_root(root='.'):
-    """The first of `root` and its parents that contains a ``src`` folder.
+    """The first of `root` and its parents that contains a ``src`` folder, else the project that holds romda
+    itself (the clone of an editable install: the folder whose ``src/romda`` is this package).
+
+    The search from `root` (the working directory by default) keeps a script inside a project, a worktree or a
+    user project, on that project; the fallback keeps a script run from anywhere else (a notebook in another
+    folder, a run script called by its path) on romda's own clone, so that the model stores under
+    ``results/`` are shared instead of falling back on the working directory.
 
     The filesystem root is not searched: its system folders would otherwise mark
     '/' as the project root of any directory.
@@ -185,7 +194,11 @@ def get_project_root(root='.'):
     for p in [start, *start.parents]:
         if p != p.parent and (p / 'src').is_dir():
             return str(p)
-    raise FileNotFoundError("Project root directory not found. Ensure you are in the correct directory structure.")
+    package_root = Path(__file__).resolve().parents[2]          # <root>/src/romda/utils.py
+    if (package_root / 'src' / 'romda').is_dir():
+        return str(package_root)
+    raise FileNotFoundError(f"Project root directory not found: no folder of {start} or its parents holds a src "
+                            "folder, and romda is not installed from a clone (src/romda).")
 
 
 def set_working_directories(subfolder='', root='.'):
@@ -351,6 +364,61 @@ def create_dataset_from_model(model_class, num_lyap_times=300, noise_level=0.02,
                               noise_level=noise_level, seed=seed, **kwargs)
 
 
+
+
+def record_key(name, record):
+    """`name` tagged with a SHA-256 digest of the bytes of `record`.
+
+    The file name of a record fixes its options (noise level, length, seed) but not
+    its content: two environments can integrate the same chaotic system to records
+    that differ by round-off amplified over the Lyapunov times. Passed as the
+    `training_data_filename` of a network, the tag keys the store by the data the
+    network actually trained on, so a regenerated record never loads a network
+    trained on an older one."""
+    record = np.ascontiguousarray(record, dtype=np.float64)
+    digest = hashlib.sha256(record.tobytes() + str(record.shape).encode()).hexdigest()
+    return f'{name}@{digest[:12]}'
+
+
+def noisy_copy(clean, noise_level, seed=0):
+    """`clean` plus Gaussian noise of `noise_level` times the standard deviation of each component (over the first
+    axis), as `dynamodels.utils.create_dataset` draws the noisy record of a dataset. `seed` is a seed or a
+    `numpy.random.Generator`, whose draws continue from call to call."""
+    rng = np.random.default_rng(seed)
+    return clean + rng.normal(scale=noise_level * clean.std(axis=0), size=clean.shape)
+
+
+def trajectory(model_class, seed=0, n_steps=1000, t_transient=None,
+               constructor_defaults=None, **params):
+    """`n_steps` on-attractor states of any physical `Model` at the given parameters.
+
+    `constructor_defaults` holds the per-model constructor fallbacks (`dt`, `Nx`, ...); explicit `params` win.
+    """
+    params = {**(constructor_defaults or {}), **params}
+    rng = np.random.default_rng(seed)
+    psi0 = np.ravel(model_class(**params).psi0)
+    model = model_class(psi0=psi0 + rng.normal(scale=.1, size=psi0.size), **params)
+
+    psi, _ = model.time_integrate(Nt=int(round((t_transient or model.t_transient) / model.dt)))
+    model.update_history(psi[-1:], t=np.array([0.]), reset=True)
+    psi, _ = model.time_integrate(Nt=n_steps - 1)
+    model.update_history(psi, t=None)
+
+    return model.hist[:, :model.Nphi, 0]
+
+
+def collected(job):
+    """A job of a pool of workers that first collects the garbage of the earlier jobs of its worker, as `deploy` does.
+
+    Models and estimators sit in reference cycles (a model and its integrator, a filter and the closures that replace
+    its methods), which Python frees only at a collection, and the allocations of numpy do not trigger one: without
+    it, a worker of the L96-40s sweeps of the washout-free ESN-DA example kept the ensemble of every job that it had run,
+    1.1 GB each, and grew to 40 to 44 GB. Decorate every job that builds a filter without `deploy`."""
+    @functools.wraps(job)
+    def collecting_job(*args, **kwargs):
+        gc.collect()
+        return job(*args, **kwargs)
+    return collecting_job
 
 
 def download_zenodo_file(download_url, data_folder='./', filename=None):

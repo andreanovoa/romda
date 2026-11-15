@@ -2,7 +2,7 @@
 
 The tutorial notebooks below build up from the basic classes to full real-data digital
 twins, numbered by topic. The source lives in
-[`tutorials/`](https://github.com/andreanovoa/real-time-bias-aware-DA/tree/main/tutorials).
+[`tutorials/`](https://github.com/andreanovoa/romda/tree/main/tutorials).
 Topics 0 and 1, and the POD / POD-ESN notebooks of topic 3, are rendered inline (with
 saved outputs); the rest link out to GitHub for now. Two arcs run through them: DA
 concepts (1) applied to physical models (2), and reduced-order-model concepts (3)
@@ -27,6 +27,7 @@ combined with DA in real time (4).
 | [Augmented formulation](tutorials/1_Introduction_to_real-time_DA/13_real-time-DA-augmented-state.md) | Combined state and parameter estimation. |
 | [Chaos and DA (Lorenz 63)](tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md) | Ensemble DA on a chaotic system. |
 | [Model-bias-aware DA](tutorials/1_Introduction_to_real-time_DA/16_Bias-aware_real-time_DA.md) | The r-EnKF with an ESN bias estimator on the Van der Pol model. |
+| [Bimodal posterior (Gaussian mixture)](tutorials/1_Introduction_to_real-time_DA/17_Gaussian_mixture_ensemble_filter.md) | Lorenz-63 observed through $z$ alone: the bimodal posterior and the Gaussian-mixture ensemble filter. |
 
 ## 2. Real-time DA in thermoacoustics
 
@@ -47,7 +48,7 @@ combined with DA in real time (4).
 
 | Notebook | Contents |
 | --- | --- |
-| [Real-time DA with POD-ESN](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb) | Assimilating sparse sensors into the POD-ESN wake model.* |
+| [Real-time DA with POD-ESN](https://github.com/andreanovoa/romda/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb) | Assimilating sparse sensors into the POD-ESN wake model.* |
 
 
 \* These notebooks download their dataset from [Zenodo](https://zenodo.org/) on first use ([annular data](https://zenodo.org/records/15609832), [wake data](https://zenodo.org/records/15623774)).

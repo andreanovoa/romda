@@ -8,6 +8,7 @@ Recurrent-network building blocks mixed into the data-driven forecast models
 other RNN architectures (e.g. GRU) will live here too.
 """
 
+from .builders import model_esn, network_summary, parametric_esn, twin_data
 from .esn import ESN_model, phi_to_esn_layout
 from .esn_config import (
     ESN_STORE,
@@ -15,6 +16,7 @@ from .esn_config import (
     auto_load_or_create,
     find_matching_config,
     load_esn_model_from_config,
+    rekey_esn_store,
     save_esn_model_to_config,
 )
 
@@ -26,6 +28,11 @@ __all__ = [
     "auto_load_or_create",
     "find_matching_config",
     "load_esn_model_from_config",
+    "rekey_esn_store",
     "save_esn_model_to_config",
+    "model_esn",
+    "network_summary",
+    "parametric_esn",
+    "twin_data",
 ]
 

@@ -97,6 +97,9 @@ class KalmanFilter(SequentialEstimator):
         super().__init__(**kwargs)
         if set(kwargs) - self._consumed_kwargs:
             raise TypeError(f"unexpected keyword arguments: {sorted(set(kwargs) - self._consumed_kwargs)}")
+        if self.adaptive_inflation or self.innovation_inflation:
+            raise NotImplementedError(f"{self.name} has no forecast ensemble: inflation='adaptive' and "
+                                      "'innovation' are options of EnsembleFilter.")
         if self._psi is None:
             raise TypeError(f"{self.name} needs the initial state, psi0=...")
         model, N = self._model, self.N

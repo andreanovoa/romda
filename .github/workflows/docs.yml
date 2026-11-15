@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'andreanovoa/real-time-bias-aware-DA'
+    if: github.repository == 'andreanovoa/romda'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

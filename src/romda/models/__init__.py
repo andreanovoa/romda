@@ -3,7 +3,7 @@
 The modelling core (``Model``, ``HistoryTracker``, the integrators and the
 physical models) lives in the standalone ``dynamodels`` package and is
 re-exported here; this subpackage keeps the data-driven models (ESN, POD-ESN,
-LinearModel).
+LinearModel) and a fixed-step integrator of the physical models (`RK4Integrator`).
 
 The ``sys.modules`` aliases below keep previously saved pickles loadable:
 stock pickle stores fully-qualified class paths such as
@@ -38,6 +38,7 @@ for _mod in ('annular', 'kuramoto_sivashinsky', 'lorenz63', 'lorenz96', 'rijke',
     sys.modules[f'{__name__}.physical.{_mod}'] = getattr(dynamodels.physical, _mod)
 
 from . import data_driven  # noqa: E402  (needs the aliases in place)
+from .rk4 import RK4Integrator  # noqa: E402
 
 __all__ = [
     "Model",
@@ -46,6 +47,7 @@ __all__ = [
     "IVPIntegrator",
     "DiscreteIntegrator",
     "ConstantIntegrator",
+    "RK4Integrator",
     "physical",
     "data_driven",
 ]

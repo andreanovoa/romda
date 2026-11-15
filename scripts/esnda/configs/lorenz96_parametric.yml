@@ -1,0 +1,59 @@
+# Parametric ESN-DA: reduced Lorenz-96 (Nx = 10) trained across F = 3.5-8
+# (limit cycle, quasi-periodic band, chaos), deployed on a fresh truth at an
+# unseen F with the forcing estimated online. Values mirror
+# the historical dev/ESN-DA defaults exactly.
+name: lorenz96_parametric
+truth:
+  model: Lorenz96
+  params:
+    Nx: 10            # truth constructor kwarg (also seeds the training trajectories)
+  noise_level: 0.02   # the training segments and the fresh truth trajectory, as the record of L96-10s (lorenz96_small.yml)
+forecast:
+  kind: parametric_esn
+  train:
+    param: F
+    est_name: F
+    label: null
+    # crosses the bifurcations; 0.25 to 0.5 apart in the chaotic range too (6.5, the chaotic
+    # truth of the studies, stays unseen). The coarse set [.., 5.0, 6.0, 7.0, 8.0] gave a
+    # network with a valid time of 0.3 Lyapunov times in chaos (2026-09-18).
+    values: [3.5, 3.75, 4.0, 4.25, 4.5, 5.0, 5.5, 6.0, 6.25, 6.75, 7.0, 7.5, 8.0]
+    dt: 0.01
+    t_train_lyap: 60
+    t_val_lyap: 5
+    t_test_lyap: 5
+  esn:
+    N_units: 1000
+    upsample: 2
+    N_wash: 20
+    N_folds: 32
+    N_grid: 3
+    N_func_evals: 30      # 18 evaluations over 5 search dimensions picked sigma_in ~ 0.002
+    rho_range: [0.4, 1.2]  # spectral radius at least 0.4 (memory); the wide range [0.05, 1.2] converged to 0.05: memoryless, fails in chaos
+    tikh_range: [1.0e-6, 1.0e-9, 1.0e-10, 1.0e-12]
+    sigma_in_range: [-3, 0.477]
+    noise: 0.0                # no added input noise: the training segments carry the 2% noise of truth.noise_level
+                              # (romda.models.data_driven.rnns.parametric_esn); with 0.01 on top, the network forecasts for 3.5, 2.8 and 2.0
+                              # T_lambda at F = 6.5, 7 and 8, against 3.8, 3.5 and 2.3 (medians of 20 windows, 2026-11-11)
+    seed: 0
+    Win_type: sparse_dense_bias   # every unit sees the input bias; b_in = mean |u_norm| (Racca & Magri)
+    bias_in: 0.152
+da:
+  seed: 0
+  n_measured: 10
+  ring: true          # Lorenz-96 sites are cyclic: spread sensors on a ring (site Nx IS site 0)
+  da_method: EnSRKF
+  m: 64
+  Nt_obs: 8
+  std_obs: 0.1
+  inflation: innovation      # the innovation-based inflation of the paper (Sect. 3.3)
+  inflation_guard: true       # lambda~ = 1 while the forecast variance at the sensors exceeds tr C_dd
+  inflation_average: plain    # a running mean of lambda~, clipped to [1, inflation_max^2] at every analysis
+  inflation_rate: 0.1         # its weight: about the last ten analyses
+  inflation_max: 3.0          # sqrt(lambda) <= 3
+  cdd_fraction: 0.2           # C_dd: 0.2 of the standard deviation of each observable (CDD_STD overrides it)
+  adaptive_inflation: false   # true: the factor of Evensen (2009, Sect. 15.3) at each analysis,
+                              # in place of inflation
+  inflate_parameters: true    # false: the inflation acts on the state rows only
+  F_true: 6.5         # chaotic regime; the regime markers live in the run script
+window_lyap: [2.0, 22.0, 4.0]

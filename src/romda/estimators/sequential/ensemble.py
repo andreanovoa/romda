@@ -6,6 +6,7 @@ with the classes, keywords and equations of ``biasda`` (``biasda.sequential.ense
 The other updates of ``biasda.EnsembleFilter`` (``'deterministic'``, ``'sqrt-random'``,
 ``'sqrt-serial'``, ``'sqrt-half'``), the dual scheme, localization, the bias-estimation routes, the
 particle filters and the smoothers live in biasda only.
+The exception is the LETKF (``type='sqrt'`` with ``localization``), which romda has too.
 
 Bias-aware assimilation is a configuration, not a class tree: passing
 ``parent_bias=<Bias>`` to any filter corrects the forecast observables with the
@@ -149,6 +150,11 @@ class EnsembleEstimator(SequentialEstimator):
 
     # ── Ensemble-specific class-level defaults ────────────────────────────────
     update_reservoir: bool = True
+    # Gaussian-mixture analysis (`romda.estimators.sequential.mixture`): the largest number of components of the
+    # forecast ensemble (1: the Gaussian analysis), and the fewest members of a component.
+    mixture: int = 1
+    mixture_min_members: int = 3
+    _mixture_cache = None
 
     # ── Constructor ───────────────────────────────────────────────────────────
 
@@ -186,10 +192,15 @@ class EnsembleEstimator(SequentialEstimator):
         model_kwargs = {k: v for k, v in kwargs.items() if k not in self._consumed_kwargs and k not in ensemble_kwargs}
         model_kwargs |= {k: v for k, v in model_args.items() if k not in ensemble_kwargs}
 
-        # Instantiate or copy the model.
+        # Instantiate or copy the model. A model instance takes no constructor keywords: whatever remains is a keyword
+        # that neither the filter nor init_ensemble takes (a misspelling, or an option of another build), which the
+        # copy would drop silently.
         if isinstance(parent_model, type):
             parent_model = parent_model(**model_kwargs)
         else:
+            if model_kwargs:
+                raise TypeError(f"unexpected keyword arguments: {sorted(model_kwargs)} (parent_model is an instance "
+                                f"of {type(parent_model).__name__}, whose constructor they would have gone to)")
             parent_model = parent_model.copy()
 
         parent_model.init_ensemble(**ensemble_kwargs)
@@ -199,6 +210,10 @@ class EnsembleEstimator(SequentialEstimator):
         self._init_bias(parent_bias)
         self.inflation_history = InflationData(times=[], factors=[])
         self.rejected_analysis = RejectedData(times=[], reasons=[])
+        from romda.estimators.sequential.mixture import MixtureData
+        if not (isinstance(self.mixture, (int, np.integer)) and self.mixture >= 1):
+            raise ValueError(f"mixture={self.mixture!r}: expected the largest number of components, an integer >= 1.")
+        self.mixture_history = MixtureData(times=[], labels=[], weights_f=[], weights_a=[], counts=[])
 
     # ── Ensemble-specific observable helpers ─────────────────────────────────
     @property
@@ -239,6 +254,9 @@ class EnsembleEstimator(SequentialEstimator):
         Builds the augmented forecast ensemble, delegates the filter update to
         ``_analysis_kernel``, applies inflation, validates parameters, and
         updates the model history in-place.
+        With ``mixture`` > 1, a forecast ensemble with several modes receives one
+        update per mode, and the members are redistributed among the modes by their
+        evidence (`romda.estimators.sequential.mixture`).
 
         Parameters
         ----------
@@ -268,49 +286,33 @@ class EnsembleEstimator(SequentialEstimator):
         # Append observables to form augmented state.
         y = self.model.get_observables()       # (Nq, m)
         Af_aug = np.vstack((Af_state, y))      # (Nphi+Na+Nq, m)  or  (Nphi+Nq, m)
+        Af_fc = Af_aug                         # the forecast without the prior inflation
 
-        alpha_rows = slice(self.Nphi, self.Nphi + self.Na)
+        Aa = None
+        labels = np.zeros(Af_aug.shape[1], dtype=int)
+        if self.mixture > 1:                   # the component of each member
+            labels = self.mixture_labels(Af_state)
+            self.mixture_history.times.append(self.current_time)
+            self.mixture_history.labels.append(labels)
 
-        # ── Call the subclass filter kernel ──────────────────────────────────
-        Aa = self._analysis_kernel(Af_aug, d, Cdd)
-
-        # ── Covariance inflation (Evensen 2009, Chap. 15) ────────────────────
-        rho = self.inflation_factor
-        if rho != 1.0:
-            Aa = multiplicative_inflation(Aa, self._inflation_rows(rho, len(Aa), Af_params))
+        # ── Prior inflation from the innovation (Li, Kalnay & Miyoshi 2009) ──
+        # The analysis starts from the inflated forecast; a mixture inflates each component about its own mean.
+        if self.innovation_inflation:
+            rho = self._innovation_inflation_factor(Af_aug, d, Cdd)
+            Af_aug = self._inflate_components(Af_aug, self._inflation_rows(rho, len(Af_aug), Af_params), labels)
             self.inflation_history.times.append(self.current_time)
             self.inflation_history.factors.append(rho)
 
-        # ── Parameter validity checks ─────────────────────────────────────────
-        # Frozen parameters (Af_params set) are not in Aa: nothing to validate.
-        if self.Na > 0 and Af_params is None and self.alpha_limits_matrix is not None:
-            is_physical, idx_alpha = self.has_valid_params(Aa[alpha_rows], self.alpha_limits_matrix)
-            if not is_physical:
-                self._reject(self.current_time, f'Non-physical parameters at indices {idx_alpha}')
-                Aa = multiplicative_inflation(Af_aug, self._inflation_rows(self.inflation_factor_rejection,
-                                                                           len(Af_aug), Af_params))
-                if self.inflate_parameters and not self.has_valid_params(Aa[alpha_rows], self.alpha_limits_matrix)[0]:
-                    # The inflation itself takes a parameter out of its limits: keep the forecast,
-                    # as the original rBA-EnKF code does (DA.analysisStep). Otherwise every further
-                    # rejection inflates the ensemble again, and the spread grows without bound.
-                    Aa = Af_aug.copy()
-
-        # ── State rejection: the analysis moves the mean of the physical state too far ───
-        if self.max_mean_shift is not None:
-            rows = self._physical_rows()
-            shift = np.linalg.norm(Aa[rows].mean(1) - Af_state[rows].mean(1)) / np.linalg.norm(self.model_climatology())
-            if shift > self.max_mean_shift:
-                self._reject(self.current_time, f'State mean moves {shift:.2f} climatological std')
-                Aa = np.vstack((Af_state, y))          # the forecast, without the prior inflation
-
-        # An EnKF-type gain corrects each state row from its own covariance with y,
-        # independent of what other rows are present -- so leaving the reservoir out
-        # of the analysis is the same as running it and discarding its correction.
-        if not self.update_reservoir:
-            N_units = _reservoir_size(self.model)
-            if N_units > 0:
-                reservoir_rows = slice(self.model.N_dim, self.model.N_dim + N_units)
-                Aa[reservoir_rows, :] = Af_aug[reservoir_rows, :]
+        if labels.max() > 0:                   # one analysis per component (romda.estimators.sequential.mixture)
+            from romda.estimators.sequential.mixture import mixture_update
+            Aa = mixture_update(self, Af_aug, Af_fc, labels, d, Cdd, Af_params)
+        elif self.mixture > 1:
+            m = Af_aug.shape[1]
+            self.mixture_history.weights_f.append(np.ones(1))
+            self.mixture_history.weights_a.append(np.ones(1))
+            self.mixture_history.counts.append(np.array([m]))
+        if Aa is None:
+            Aa = self._gaussian_update(Af_aug, Af_fc, d, Cdd, Af_params)
 
         # ── Update model history ─────────────────────────────────────────────
         # Only the state rows go to the model; the observables are derived.
@@ -336,6 +338,130 @@ class EnsembleEstimator(SequentialEstimator):
             # augmented observables, which are derived rather than stored.
             return Aa_psi
 
+    def _gaussian_update(self, Af_aug, Af_fc, d, Cdd, Af_params):
+        """The analysis of the forecast `Af_aug` (N, m), with one Gaussian for the forecast: the kernel of the filter,
+        the posterior inflation, the parameter checks, the rejection of the analysis (which keeps `Af_fc`, the
+        forecast without the prior inflation) and the reservoir rows of an input-only update."""
+        alpha_rows = slice(self.Nphi, self.Nphi + self.Na)
+
+        # ── Call the subclass filter kernel ──────────────────────────────────
+        Aa = self._analysis_kernel(Af_aug, d, Cdd)
+
+        # ── Covariance inflation (Evensen 2009, Chap. 15) ────────────────────
+        rho = self.inflation_factor
+        if self.adaptive_inflation:
+            from romda.estimators.inflation import adaptive_inflation_factor
+            rho = adaptive_inflation_factor(self.member_space_transform(), rng=self.rng,
+                                            n_rand=self.inflation_n_rand)
+        if rho != 1.0:
+            Aa = multiplicative_inflation(Aa, self._inflation_rows(rho, len(Aa), Af_params))
+            self.inflation_history.times.append(self.current_time)
+            self.inflation_history.factors.append(rho)
+
+        # ── Parameter validity checks ─────────────────────────────────────────
+        # Frozen parameters (Af_params set) are not in Aa: nothing to validate.
+        if self.Na > 0 and Af_params is None and self.alpha_limits_matrix is not None:
+            is_physical, idx_alpha = self.has_valid_params(Aa[alpha_rows], self.alpha_limits_matrix)
+            if not is_physical:
+                self._reject(self.current_time, f'Non-physical parameters at indices {idx_alpha}')
+                Aa = multiplicative_inflation(Af_aug, self._inflation_rows(self.inflation_factor_rejection,
+                                                                           len(Af_aug), Af_params))
+                if self.inflate_parameters and not self.has_valid_params(Aa[alpha_rows], self.alpha_limits_matrix)[0]:
+                    # The inflation itself takes a parameter out of its limits: keep the forecast,
+                    # as the original rBA-EnKF code does (DA.analysisStep). Otherwise every further
+                    # rejection inflates the ensemble again, and the spread grows without bound.
+                    Aa = Af_aug.copy()
+
+        # ── State rejection: the analysis moves the mean of the physical state too far ───
+        if self.max_mean_shift is not None:
+            rows = self._physical_rows()
+            shift = np.linalg.norm(Aa[rows].mean(1) - Af_fc[rows].mean(1)) / np.linalg.norm(self.model_climatology())
+            if shift > self.max_mean_shift:
+                self._reject(self.current_time, f'State mean moves {shift:.2f} climatological std')
+                Aa = Af_fc.copy()                      # the forecast, without the prior inflation
+
+        # An EnKF-type gain corrects each state row from its own covariance with y,
+        # independent of what other rows are present -- so leaving the reservoir out
+        # of the analysis is the same as running it and discarding its correction.
+        if not self.update_reservoir:
+            N_units = _reservoir_size(self.model)
+            if N_units > 0:
+                reservoir_rows = slice(self.model.N_dim, self.model.N_dim + N_units)
+                Aa[reservoir_rows, :] = Af_aug[reservoir_rows, :]
+        return Aa
+
+    def mixture_labels(self, Af_state: np.ndarray) -> np.ndarray:
+        """Component of each member of the forecast `Af_state` (N, m), from the Gaussian mixture fitted to its physical
+        rows in units of their climatological standard deviation (`model_climatology`;
+        `romda.estimators.sequential.mixture.fit_mixture`). The fit is computed once per analysis time, so that an
+        inflation applied before `analysis_step` (e.g. by a harness) and the analysis use the same components."""
+        from romda.estimators.sequential.mixture import fit_mixture
+        if self._mixture_cache is not None and self._mixture_cache[0] == self.current_time:
+            return self._mixture_cache[1]
+        labels, _ = fit_mixture(Af_state[self._physical_rows()], self.mixture, self.rng, self.mixture_min_members,
+                                scale=self.model_climatology())
+        self._mixture_cache = (self.current_time, labels)
+        return labels
+
+    @staticmethod
+    def _inflate_components(A: np.ndarray, rho, labels: np.ndarray) -> np.ndarray:
+        """Multiplicative inflation of each component of the ensemble `A` (N, m) about its own mean."""
+        out = A.copy()
+        for k in range(labels.max() + 1):
+            cols = labels == k
+            out[:, cols] = multiplicative_inflation(A[:, cols], rho)
+        return out
+
+    _inflation_moments = None   # running means of lambda~ tr(C_yy) and tr(C_yy), inflation='innovation'
+
+    def _innovation_inflation_factor(self, Af: np.ndarray, d: np.ndarray, Cdd: np.ndarray) -> float:
+        """Deviation factor sqrt(lambda) of ``inflation='innovation'`` for the forecast `Af`.
+
+        The innovation and the predicted covariance are those of the analysis that follows (see
+        `innovation_inflation_factor`): the bias-corrected innovation at the forecast mean with
+        ``(I + J)``-mapped deviations. The estimate is averaged over the analyses with the weight
+        ``inflation_rate``, and the returned variance factor is bounded by one and ``inflation_max``
+        squared.
+        """
+        from romda.estimators.inflation import innovation_inflation_factor
+        d, Cdd = np.atleast_1d(d), np.atleast_2d(Cdd)
+        Y = self._MA(Af)
+        y = Y.mean(1, keepdims=True)
+        S, nu = Y - y, d[:, None] - y
+        if self._bias_active():
+            b, J, d = self._bias_terms(y.ravel(), d)
+            S, nu = (np.eye(len(d)) + J) @ S, d[:, None] - y - b
+        Cyy = S @ S.T / (Af.shape[1] - 1)
+        weight = np.trace(Cyy)
+        upper = np.inf if self.inflation_max is None else self.inflation_max**2
+        if self.inflation_average == 'plain':
+            if self.inflation_guard and weight > np.trace(Cdd):
+                one = 1.0
+            elif weight > 0:
+                one = float(np.clip(innovation_inflation_factor(nu, Cdd, Cyy), 1.0, upper))
+            else:                               # no spread at the sensors: the limit of the ratio, without 0/0
+                one = upper if np.ravel(nu) @ np.ravel(nu) > np.trace(Cdd) else 1.0
+            lam = 1.0 if self._inflation_moments is None else self._inflation_moments
+            self._inflation_moments = (1.0 - self.inflation_rate) * lam + self.inflation_rate * one
+            return float(np.sqrt(self._inflation_moments))
+        if self.inflation_average != 'weighted':
+            raise ValueError(f"inflation_average={self.inflation_average!r}: expected 'weighted' or 'plain'.")
+        # Running mean of lambda~ weighted by tr C_yy, i.e. the ratio of the running means of
+        # nu^T nu - tr C_dd and tr C_yy, from lambda = 1: the one-sample estimate is noisiest when the
+        # spread is small, and its plain mean is biased upward (lambda ~ 1.1 on a perfect model).
+        # The bounds act on the factor it returns, not on the mean, which a lower bound would bias too.
+        # With no spread at the sensors, lambda~ is 0/0: its weighted term is the numerator itself.
+        excess = (innovation_inflation_factor(nu, Cdd, Cyy) * weight if weight > 0
+                  else np.ravel(nu) @ np.ravel(nu) - np.trace(Cdd))
+        if self.inflation_guard and weight > np.trace(Cdd):
+            excess = weight                     # lambda~ = 1 before the ensemble synchronizes
+        if self._inflation_moments is None:
+            self._inflation_moments = np.array([weight, weight])
+        r = self.inflation_rate
+        self._inflation_moments = (1.0 - r) * self._inflation_moments + r * np.array([excess, weight])
+        if self._inflation_moments[1] <= 0:     # no spread yet: a factor would scale zero deviations
+            return 1.0
+        return float(np.sqrt(np.clip(self._inflation_moments[0] / self._inflation_moments[1], 1.0, upper)))
 
     def __getstate__(self):
         # The lazy member-space transform is a local closure, which pickle refuses; it is rebuilt by the next analysis.
@@ -602,6 +728,13 @@ class EnsembleFilter(EnsembleEstimator):
     ``'sqrt-random'``, ``'sqrt-serial'``, ``'sqrt-half'``, ``parameter_estimation='dual'``,
     ``bias_estimation`` and ``localization``) live in biasda and raise NotImplementedError here.
 
+    The exception is ``localization`` (a Gaspari-Cohn half-radius) with ``type='sqrt'``, the local ensemble transform
+    Kalman filter (LETKF; Hunt et al. 2007): every augmented row takes its own square-root transform, with
+    $\matr{C}_{dd}^{-1}$ tapered by the distance between the row and each observable
+    (`_local_transform`). ``state_positions`` (default: the index of each physical component),
+    ``obs_positions`` (required unless every component is observed) and ``loc_period`` (a ring) set the
+    distances; the parameter rows are not localized.
+
     Parameters
     ----------
     type : str, optional
@@ -613,6 +746,13 @@ class EnsembleFilter(EnsembleEstimator):
         Bias estimator; any `Bias` other than `NoBias` makes the analysis bias-aware.
     inflation : float, optional
         Multiplicative inflation factor (default 1.0).
+        ``'adaptive'`` estimates the factor at every analysis.
+        ``'innovation'`` inflates the forecast deviations, before the analysis, by
+        $\sqrt{\lambda}$, with the variance factor $\lambda$ estimated from the bias-corrected
+        innovation (Li, Kalnay & Miyoshi 2009; `romda.estimators.inflation.innovation_inflation_factor`).
+        ``inflation_rate`` (default 0.1) is the weight of every new estimate in $\lambda$, which is
+        bounded below by one and above by ``inflation_max`` squared (default None, no bound).
+        ``inflation_history`` records the deviation factors, $\sqrt{\lambda}$ for ``'innovation'``.
 
     Other Parameters
     ----------------
@@ -640,10 +780,14 @@ class EnsembleFilter(EnsembleEstimator):
     Nóvoa, Racca & Magri (2023). Inferring unknown unknowns: Regularized bias-aware
     ensemble Kalman filter. *Comput. Methods Appl. Mech. Eng.*, 418, 116502.
     [DOI: 10.1016/j.cma.2023.116502](https://doi.org/10.1016/j.cma.2023.116502).
+
+    Li, Kalnay & Miyoshi (2009). Simultaneous estimation of covariance inflation and observation
+    errors within an ensemble Kalman filter. *Q. J. R. Meteorol. Soc.*, 135, 523-533.
     """
 
     type: str = 'stochastic'
     parameter_estimation: str | None = None
+    _localization = True
     #: The named entry points (EnKF, EnSRKF, ...) estimate the parameters jointly when the
     #: model has ``est_alpha``; `EnsembleFilter` asks for ``parameter_estimation`` explicitly.
     _infer_parameter_estimation = False
@@ -664,6 +808,7 @@ class EnsembleFilter(EnsembleEstimator):
                 raise NotImplementedError("localization= with type='stochastic' is an option of biasda.EnsembleFilter; "
                                           "romda localizes type='sqrt' (the LETKF).")
             biasda_only = self.bias is not None and not isinstance(self.bias, NoBias)
+            biasda_only = biasda_only or self.adaptive_inflation
             if biasda_only:
                 raise NotImplementedError("localization= with inflation='adaptive' or a bias is an option of "
                                           "biasda.EnsembleFilter.")
@@ -732,7 +877,9 @@ class EnsembleFilter(EnsembleEstimator):
         pos_x, pos_q = self._positions(self.Nphi, Nq)
         L_xy = np.ones((N_rows, Nq))
         L_xy[:self.Nphi, :] = localization_matrix(pos_x, pos_q, self.loc_radius, period=self.loc_period)
-        # Parameter rows (between Nphi and N_rows - Nq) keep 1: no position, no localization.
+        # Parameter rows (between Nphi and N_rows - Nq) and state rows with no position (nan, e.g. a reservoir unit fed
+        # by the bias alone) keep 1: no position, no localization.
+        L_xy[:self.Nphi][np.isnan(np.asarray(pos_x, dtype=float))] = 1.0
         L_yy = localization_matrix(pos_q, pos_q, self.loc_radius, period=self.loc_period)
         L_xy[N_rows - Nq:, :] = L_yy
         return L_xy, L_yy
@@ -746,22 +893,26 @@ class EnsembleFilter(EnsembleEstimator):
         $(m-1)\mathbb{I} + {\matr{Q}'}^\mathrm{T}\matr{R}_i^{-1}\matr{Q}'$, the mean weights are
         $\vect{w}_i = \matr{V}\matr{\Lambda}^{-1}\matr{V}^\mathrm{T}{\matr{Q}'}^\mathrm{T}\matr{R}_i^{-1}\vect{\nu}$
         and the deviation transform is $\matr{T}_i^{1/2} = \matr{V}((m-1)\matr{\Lambda}^{-1})^{1/2}\matr{V}^\mathrm{T}$.
-        With no taper, every row takes the global square-root update of `_sqrt_factors`.
+        With no taper, every row takes the global square-root update of `_sqrt_factors`. Rows with the same taper
+        have the same transform, which is computed once: the state of an ESN has many rows per site (the reservoir
+        of a parallel network has one position per patch). `_row_transforms` holds the distinct transforms and
+        `_row_index` the one of each row, ``T_i = _row_transforms[_row_index[i]]``.
         """
         m = Psi_f.shape[1]
         L_xy, _ = self._loc_matrices(Psi_f.shape[0], Nq)
+        L_xy, index = np.unique(L_xy, axis=0, return_inverse=True)
         sqrt_rho = np.sqrt(np.tile(L_xy, (1, S_eff.shape[0] // Nq)))
         Cdd_inv = inv(Cdd_eff)
         ones_m = np.full((m, m), 1.0 / m)
-        T = np.empty((Psi_f.shape[0], m, m))
+        T = np.empty((len(L_xy), m, m))
         for i, r in enumerate(sqrt_rho):
             R_inv = r[:, None] * Cdd_inv * r[None, :]
             ev, V = np.linalg.eigh((m - 1) * np.eye(m) + S_eff.T @ R_inv @ S_eff)
             w = V @ ((V.T @ (S_eff.T @ R_inv @ z)) / ev[:, None])         # (m, 1)
             W = V @ np.diag(np.sqrt((m - 1) / ev)) @ V.T                  # T^{1/2}
             T[i] = ones_m + (np.eye(m) - ones_m) @ (w + W)
-        self._row_transforms = T
-        return np.einsum('im,imn->in', psi_f_m + Psi_f, T)
+        self._row_transforms, self._row_index = T, index.ravel()
+        return np.einsum('im,imn->in', psi_f_m + Psi_f, T[self._row_index])
 
 
 # ══════════════════════════════════════════════════════════════════════════════

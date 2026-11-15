@@ -58,7 +58,7 @@ def on_pre_build(config, **kwargs):
             return f"](../{rendered[stem]}/{stem}.md)"
         nb_path = next(SRC.rglob(f"{stem}.ipynb"), None)
         folder = nb_path.parent.name if nb_path else ""
-        return f"](https://github.com/andreanovoa/real-time-bias-aware-DA/blob/main/tutorials/{folder}/{stem}.ipynb)"
+        return f"](https://github.com/andreanovoa/romda/blob/main/tutorials/{folder}/{stem}.ipynb)"
 
     for topic_dest in {DEST / p.parent.name for p in nb_paths}:
         shutil.rmtree(topic_dest, ignore_errors=True)
