@@ -15,6 +15,7 @@ documentation for the reservoir API) — and `POD_ESN` mixes in `ESN_model` and
 | `ESN_model` | `N_units`, `rho`, `sigma_in`, `N_wash` | Inherits `EchoStateNetwork`; requires training `data` at init |
 | `LatentROM` | `Nq`, `measure_modes`, `qr_selection` | Base of every projector + forecaster ROM (any `Projector`, any forecaster `Model`) |
 | `POD_ESN` | `N_modes`, `sensor_locations` | `LatentROM` + `ESN_model` + `POD`; sensor placement via QR |
+| `CAE_ESN`, `CAE1D_ESN`, `MultiScaleCAE_ESN` | `n_latent`, `projector`, `projector_epochs`, `forecaster_epochs` | The CAE-ESN: `LatentROM` + `ESN_model` + `CAE`, `CAE1D` or `MultiScaleCAE` (optional extra `torch`; [page](models_data_driven_latent_roms.md)) |
 | `LinearModel` | `F` (transition matrix), `Q_noise` | $\vect{\psi}_{t+1} = \matr{F}\vect{\psi}_t + \vect{\eta}_t$ |
 
 ## Latent reduced-order models
@@ -29,8 +30,10 @@ therefore a forecast model for the estimators in the same way as `POD_ESN`.
 `LatentROM` and the generalized `Projector` interface were written by Lukas Campbell
 (autoencoder-rom, 2026).
 
-The `Projector` hierarchy (`POD`/`SPOD`) and the standalone decomposition functions
-(`pod_utils.py`) live in the `autoencoders/` subpackage. Import everything from
+The `Projector` hierarchy (`POD`/`SPOD` and the convolutional autoencoders `CAE`, `CAE1D`,
+`MultiScaleCAE`) and the standalone decomposition functions (`pod_utils.py`) live in the
+`autoencoders/` subpackage. The autoencoders and the CAE-ESN need the optional extra
+`romda[torch]`; the package loads torch only when one of them is first accessed. Import everything from
 `romda.models.data_driven` (or its `autoencoders` subpackage).
 
 ## Model pages
@@ -39,3 +42,5 @@ The `Projector` hierarchy (`POD`/`SPOD`) and the standalone decomposition functi
 - [POD-ESN model](models_data_driven_pod_esn.md)
 - [Linear model](models_data_driven_linear.md)
 - [Projectors and modal decompositions](models_data_driven_projectors.md)
+- [Convolutional autoencoders](convolutional_autoencoders.md): the nonlinear projectors `CAE`, `CAE1D` and `MultiScaleCAE`, their options, training and storage
+- [Latent reduced-order models](models_data_driven_latent_roms.md): `LatentROM`, the projector and forecaster combinations (`POD_ESN`, `CAE1D_ESN`, `MultiScaleCAE_ESN`), the option namespace, the sensors and the store of trained models

@@ -8,6 +8,7 @@ Complete experiments, run from the command line at the repository root after `pi
 | [`examples/lorenz/`](examples/lorenz/README.md) | `lorenz63`, `lorenz96` | Usage examples: EnKF and square-root EnKF, state and parameter estimation, the rBA-EnKF on biased observations |
 | [`thermoacoustics/`](thermoacoustics/README.md) | `rijke`, `vdp`, `annular` | Twin experiments on the Rijke tube and the Van der Pol oscillator; digital twin of an annular combustor from raw data, with the settings of Nóvoa, Noiray, Dawson & Magri (2024) |
 | [`podesn_cylinder/`](podesn_cylinder/README.md) | `pod_esn` | Nóvoa & Magri (2025): POD-ESN of the cylinder wake with online learning of the output weights |
+| [`caeesnda/`](caeesnda/README.md) | `ks`, `kolmogorov` | Özalp, Nóvoa & Magri (2026): real-time data assimilation with the CAE-ESN on the Kuramoto–Sivashinsky equation and the Kolmogorov flow (the Kolmogorov record, computed with jax-cfd, is not distributed) |
 | [`esnda/`](esnda/README.md) | scripts of a paper | Washout-free deployment of echo state networks: synchronization, parameter estimation, localization, uncertainty quantification |
 
 Each case is a YAML configuration, with a script next to it when it needs figures or steps of its own; each topic
@@ -29,7 +30,8 @@ filter_ensemble, truth, metrics = run_config('scripts/thermoacoustics/rijke.yml'
 
 `--seed` changes the initial ensemble and the observation noise; the same seed gives the same numbers.
 `--set key=value` overrides one value, and a misspelt key raises an error. The cylinder case runs only through
-`pod_esn.py`, because its truth is a set of flow snapshots, not a model.
+`pod_esn.py`, and the CAE-ESN cases only through `caeesnda/cae_esn_da.py`, because their truth is a set of flow
+snapshots, not a model.
 
 ## Sweeps
 

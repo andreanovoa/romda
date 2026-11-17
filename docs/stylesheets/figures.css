@@ -1,0 +1,27 @@
+/* Figures follow the colour scheme of the page.
+   The build (hooks.py) makes the white background of every PNG transparent, so
+   that a figure sits directly on the page. In the dark scheme the colours are
+   inverted and the hue is rotated back, which turns black lines white and keeps
+   each colour close to its original hue.
+   A figure drawn on a dark background gets the class `fig-dark` from the build
+   and is inverted in the light scheme instead.
+   Add the class `no-invert` to an image that must keep its colours (a photograph). */
+
+[data-md-color-scheme="slate"] .md-typeset img:not(.fig-dark):not(.no-invert),
+[data-md-color-scheme="slate"] .md-typeset video:not(.fig-dark):not(.no-invert),
+[data-md-color-scheme="default"] .md-typeset img.fig-dark:not(.no-invert),
+[data-md-color-scheme="default"] .md-typeset video.fig-dark:not(.no-invert) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* GIFs and inline animations keep an opaque background in the file: blend it
+   into the page (white vanishes on a light page, black on a dark page). */
+[data-md-color-scheme="default"] .md-typeset img:not([src$=".png"]):not(.no-invert),
+[data-md-color-scheme="default"] .md-typeset video:not(.no-invert) {
+  mix-blend-mode: multiply;
+}
+
+[data-md-color-scheme="slate"] .md-typeset img:not([src$=".png"]):not(.no-invert),
+[data-md-color-scheme="slate"] .md-typeset video:not(.no-invert) {
+  mix-blend-mode: screen;
+}

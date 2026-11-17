@@ -1,0 +1,52 @@
+# Settings of Nóvoa & Magri (2025), ICCS 2025, Figs. 3-5 -- consumed by
+# scripts/podesn_cylinder/iccs2025.py. The settings that the paper does not state
+# are those of its code, the release v1.1 (mains/main_cylinder.py).
+name: cylinder_iccs2025
+
+data:
+  noise_type: gauss
+  noise_level: 0.1              # eps ~ N(0, 0.1^2), as a fraction of the maximum velocity
+  smoothing: 0.1                # standard deviation of the Gaussian kernel
+  N_train: 225                  # N_t = 250 snapshots (six periods): the last tenth validates (v1.1)
+  N_val: 25
+  N_short: 90                   # N_t of the truncated training set of Fig. 5 (2.1 periods)
+
+forecast:
+  kind: pod_esn                 # data-driven ROM on snapshot data -- run by iccs2025.py, not the CLI
+
+rom:
+  # ------ POD arguments ------ #
+  domain: [0, 12, -2.5, 2.5]
+  N_modes: 4
+  skip_sensor_placement: true   # the sensors are selected for each experiment
+  # ------ ESN arguments (defaults of v1.1) ------ #
+  t_test: 0.
+  N_units: 40
+  train_ESN: true
+  N_wash: 5
+  noise: 1.0e-2
+  N_func_evals: 40
+  rho: 0.976                    # the paper's optimum of the search over rho in [0.2, 1.05] and
+  sigma_in: 0.890               # sigma_in in [0.5, 50]; here they are fixed, and the search is on tikh
+  hyperparameters_to_optimize: [tikh]
+  upsample: 1
+  # ------ Model arguments ------ #
+  dt: 0.01
+  plot_case: false
+
+sensors:                        # candidates of the QR selection (v1.1: region of the wake)
+  domain_of_measurement: [4, 7, -1, 1]
+  down_sample_measurement: [40, 10]
+  qr_selection: true
+
+truth:
+  t_start: 0.5
+  t_stop: 5.
+  Nt_obs: 25                    # Delta of Figs. 3-4; Fig. 5 takes 10, 20 and 30
+
+da:
+  method: EnSRKF
+  std_obs: 0.01
+  m: 10                         # Figs. 3-4; Fig. 5 takes m_large
+  m_large: 50
+  std_alpha: 0.1                # prior of the singular values of Wout (three-fold estimation)

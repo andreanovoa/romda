@@ -20,8 +20,9 @@ Class hierarchy
     └── POD(Projector)            Proper Orthogonal Decomposition (linear)    [pod.py]
         └── SPOD(POD)             Spectral POD (Sieber et al. JFM 2016)       [pod.py]
 
-Projectors that need an optional framework load their module on first
-access, so importing this package imports neither torch nor JAX.
+The autoencoders (`CAE`, `CAE1D`, `MultiScaleCAE`) need torch, the optional
+extra `romda[torch]`. They load their module on first access, so importing
+this package does not import torch.
 
 These are pure dimensionality-reduction tools, with no temporal forecaster.
 Combine one with an ESN to build a complete ROM (`romda.models.data_driven.LatentROM`).
@@ -39,8 +40,16 @@ from .pod_utils import print_spod_towne_summary, spod_towne
 __all__ = ['Projector', 'POD', 'SPOD', 'spod_towne', 'print_spod_towne_summary']
 
 #: Lazily loaded classes, by name: the module that defines them.
-_LAZY: dict[str, str] = {}
+_LAZY: dict[str, str] = {
+    'Autoencoder': '.autoencoder_base',  # options and save/restore of the trained projectors
+    'conv_stages': '.autoencoder_base',
+    'TorchAutoencoder': '.torch_utils',   # torch training loop shared by the autoencoders
+    'CAE': '.cae',                        # convolutional autoencoder, torch
+    'CAE1D': '.cae_esn',                  # the CAE-ESN autoencoders (MagriLab/DA-CAE-ESN), torch
+    'MultiScaleCAE': '.cae_esn',
+}
 
+__all__ += list(_LAZY)
 
 
 def __getattr__(name: str) -> Any:

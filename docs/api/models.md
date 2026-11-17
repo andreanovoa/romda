@@ -61,8 +61,8 @@ Integrator
 
 [Physical models](models_physical.md) (`VdP`, `Lorenz63`, `Lorenz96`, `KS`, `Rijke`, `Annular`) are
 documented on the [`dynamodels` docs site](https://andreanovoa.github.io/dynamodels/). Data-driven
-models (`ESN_model`, `POD_ESN`, `LinearModel`) each have their own page, with figures, under
-[Data-driven models](models_data_driven.md).
+models (`ESN_model`, `POD_ESN`, the CAE-ESN `CAE1D_ESN` and `MultiScaleCAE_ESN`, `LinearModel`)
+are documented, with figures, under [Data-driven models](models_data_driven.md).
 
 ------
 

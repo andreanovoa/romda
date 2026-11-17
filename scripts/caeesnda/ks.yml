@@ -1,0 +1,47 @@
+# Real-time DA with the CAE-ESN on the Kuramoto-Sivashinsky equation (Özalp, Nóvoa & Magri 2026), the case of
+# tutorial 45. Run by scripts/caeesnda/cae_esn_da.py: the CAE-ESN is a data-driven ROM, not a model of romda.run.
+name: ks
+
+forecast:
+  kind: cae_esn
+  t_lyap: 12.5                    # 1 / lambda_1
+  record:                         # integrated with dynamodels' KS (ETDRK4)
+    source: ks
+    Nx: 128
+    L_over_pi: 20                 # L = 20 pi
+    dt: 0.25
+    N_trans: 1000                 # transient snapshots, discarded
+    N_train: 40000
+    N_val: 1000
+    N_test: 3000
+    seed: 0
+  projector:                      # the autoencoder of the paper (github.com/MagriLab/DA-CAE-ESN)
+    class: CAE1D
+    weights: tutorials/weights/DA-CAE-ESN_ks_l20pi.pth   # from the repository root
+    scale: 3.58                   # max |u| of the record of the paper
+  rom:
+    class: CAE1D_ESN
+    n_sensors: 25                 # equispaced grid points
+  esn:                            # the hyperparameters of the paper, with fewer units
+    N_units: 5000
+    N_wash: 100
+    rho: 0.272
+    sigma_in: 0.147
+    tikh: 1.0e-5
+    Win_type: dense
+    norm_method: std
+    connect: 10
+    noise: 1.0e-3
+    seed: 0
+  t_extra_lyap: 2                 # forecast after the last analysis, in Lyapunov times
+
+truth:
+  noise_type: max                 # standard deviation: noise_level x max |u| at each sensor, as the paper
+  noise_level: 0.1
+  Nt_obs: 50                      # one analysis per Lyapunov time
+  window_lyap: 10                 # assimilation window, in Lyapunov times
+  seed: 1
+
+da:
+  method: EnKF
+  m: 100

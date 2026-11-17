@@ -69,6 +69,9 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
 
+extra_css:
+  - stylesheets/figures.css
+
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
@@ -77,6 +80,8 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Examples: experiments.md
+  - Replications:
+    - ICCS 2025, POD-ESN of the cylinder wake: replications/iccs2025.md
   - Class hierarchy: class-hierarchy.md
   - API reference:
     - romda.models:
@@ -88,6 +93,8 @@ nav:
         - POD-ESN model: api/models_data_driven_pod_esn.md
         - Linear model: api/models_data_driven_linear.md
         - Projectors and modal decompositions: api/models_data_driven_projectors.md
+        - Convolutional autoencoders: api/convolutional_autoencoders.md
+        - Latent reduced-order models: api/models_data_driven_latent_roms.md
     - romda.estimators:
       - Overview: api/estimators.md
       - Ensemble filters: api/filter_stochastic.md
@@ -117,5 +124,7 @@ nav:
       - 3. Introduction to reduced-order models:
           - POD / SPOD: tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md
           - POD-ESN on the cylinder wake: tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md
-      - 4. Real-time DA on reduced-order models (on GitHub for now):
-          - Real-time DA with POD-ESN: https://github.com/andreanovoa/romda/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb
+      - 4. Real-time DA on reduced-order models:
+          - Real-time DA with POD-ESN: tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md
+          - Real-time DA with CAE-ESN, Kuramoto–Sivashinsky: tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md
+          - Real-time DA with CAE-ESN, Kolmogorov flow: tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md

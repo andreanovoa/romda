@@ -13,6 +13,8 @@ Run as a script for a single default experiment
 builder functions from the sweeps in ``sweeps.py``.
 """
 
+import hashlib
+import json
 import os
 import sys
 
@@ -33,16 +35,21 @@ results_folder, figs_folder = output_folders(__file__)   # gitignored, next to t
 
 CFG = load_main_config('podesn_cylinder/pod_esn')
 
-# Number of training/validation snapshots; the rest are used for assimilation
-N_train, N_val = CFG['data']['N_train'], CFG['data']['N_val']
+# Sensors of `run_experiment(N_sensors=...)`, unless the configuration has a `sensors` section
+SENSORS = dict(domain_of_measurement=[4, 7, -1, 1],   # x_min, x_max, y_min, y_max (wake)
+               down_sample_measurement=(10, 10),
+               qr_selection=True)
 
 
 # ------------------------------------- Builders -------------------------------------- #
 
-def load_data(**overrides):
-    """Load the (noisy, true) cylinder snapshots and split train/filter sets."""
-    params = {**CFG['data'], **overrides}
-    params.pop('N_train'), params.pop('N_val')
+def load_data(cfg=None, **overrides):
+    """Load the (noisy, true) cylinder snapshots and split train/filter sets.
+
+    The first ``N_train + N_val`` snapshots of the configuration `cfg` (default: ``pod_esn.yml``) train the
+    reduced-order model, and the rest are held out for the assimilation."""
+    params = {**(cfg or CFG)['data'], **overrides}
+    N_train, N_val = params.pop('N_train'), params.pop('N_val')
     X_true, X_noisy, simulation_dir = load_cylinder_dataset(**params)
 
     X_train, X_train_true = [yy[:N_train + N_val].transpose(-1, 0, 1, 2) for yy in [X_noisy, X_true]]
@@ -51,13 +58,20 @@ def load_data(**overrides):
     return (X_train, X_train_true), (X_filter, X_filter_true), simulation_dir
 
 
-def build_rom(X_train, simulation_dir, use_cache=True, **overrides) -> POD_ESN:
-    """Train (or load from cache) the POD-ESN reduced-order model."""
-    params = {**CFG['rom'], **overrides}
-    params.setdefault('t_train', N_train * params['dt'])
+def build_rom(X_train, simulation_dir, use_cache=True, cfg=None, N_val=None, **overrides) -> POD_ESN:
+    """Train (or load from cache) the POD-ESN reduced-order model.
+
+    The last `N_val` snapshots of `X_train` (default: that of the configuration) validate the network.
+    The cache is named after the sizes of the model and a digest of its options, so that two
+    configurations on the same record do not share a network."""
+    cfg = cfg or CFG
+    params = {**cfg['rom'], **overrides}
+    N_val = cfg['data']['N_val'] if N_val is None else N_val
+    params.setdefault('t_train', (X_train.shape[1] - N_val) * params['dt'])
     params.setdefault('t_val', N_val * params['dt'])
+    digest = hashlib.sha1(json.dumps(params, sort_keys=True, default=str).encode()).hexdigest()[:8]
     case_filename = (f"{simulation_dir}POD{params['N_modes']}_ESN{params['N_units']}"
-                     f"_Ntrain{X_train.shape[1]}")
+                     f"_Ntrain{X_train.shape[1]}_{digest}")
 
     if use_cache and os.path.isfile(case_filename):
         rom = load_from_pickle_file(case_filename)
@@ -71,25 +85,26 @@ def build_rom(X_train, simulation_dir, use_cache=True, **overrides) -> POD_ESN:
     return rom
 
 
-def build_truth(rom: POD_ESN, X_filter, X_filter_true, **overrides) -> Observations:
-    """Sample sensor measurements from the held-out snapshots."""
-    params = {**CFG['truth'], **overrides}
+def build_truth(rom: POD_ESN, X_filter, X_filter_true, cfg=None, **overrides) -> Observations:
+    """Sample the measurements from the held-out snapshots: the sensors of `rom`, or the POD coefficients
+    of the snapshots when `rom` measures its modes (full fields)."""
+    params = {**(cfg or CFG)['truth'], **overrides}
 
     N_test = X_filter.shape[1]
-    X_flat = X_filter.transpose(1, 0, 2, 3).reshape(N_test, -1)            # Nt x Ndof
-    X_flat_true = X_filter_true.transpose(1, 0, 2, 3).reshape(N_test, -1)  # Nt x Ndof
+    if rom.measure_modes:
+        y_raw, y_true = (rom.encode(X).T for X in (X_filter, X_filter_true))  # Nt x N_modes
+    else:
+        y_raw, y_true = (X.transpose(1, 0, 2, 3).reshape(N_test, -1)[:, rom.sensor_locations]
+                         for X in (X_filter, X_filter_true))                  # Nt x Nq
 
     t_true = np.arange(N_test) * rom.dt
     params['t_stop'] = min(params['t_stop'], t_true[-10])
 
-    return Observations(y_raw=X_flat[:, rom.sensor_locations],
-                        y_true=X_flat_true[:, rom.sensor_locations],
-                        t_true=t_true,
-                        **params)
+    return Observations(y_raw=y_raw, y_true=y_true, t_true=t_true, **params)
 
 
-def build_ensemble(rom: POD_ESN, da_method=None, **overrides) -> EnsembleEstimator:
-    params = {**CFG['da'], **overrides}
+def build_ensemble(rom: POD_ESN, da_method=None, cfg=None, **overrides) -> EnsembleEstimator:
+    params = {**(cfg or CFG)['da'], **overrides}
     params.pop('std_obs', None)
     method = params.pop('method')
     return DA_METHODS[da_method or method](parent_model=rom, **params)
@@ -102,36 +117,45 @@ def run_experiment(da_method=None,
                    truth_kwargs=None,
                    ensemble_kwargs=None,
                    t_extra=None,
-                   N_sensors=None):
+                   N_sensors=None,
+                   cfg=None,
+                   return_case=False):
     """Train/load the POD-ESN, build observations from held-out snapshots, filter.
 
     ``N_sensors=None`` keeps the (down-sampled QR) sensor placement of the trained
-    ROM; an integer re-selects that many QR-pivot sensors in the wake.
+    ROM; an integer re-selects that many QR-pivot sensors in the wake, and 0 measures
+    the POD coefficients (the full fields). ``ensemble_kwargs=dict(update_reservoir=False)``
+    leaves the reservoir out of the analysis, which then updates the POD coefficients
+    only. `cfg` replaces the configuration ``pod_esn.yml``.
 
     Returns
     -------
     (EnsembleEstimator, Observations, dict)
-        Filtered ensemble, truth, and the error metrics.
+        Filtered ensemble, truth, and the error metrics; with `return_case`, also the
+        reduced-order model and the held-out ``(noisy, true)`` snapshots.
     """
-    (X_train, _), (X_filter, X_filter_true), simulation_dir = load_data(**(data_kwargs or {}))
+    cfg = cfg or CFG
+    (X_train, _), (X_filter, X_filter_true), simulation_dir = load_data(cfg=cfg, **(data_kwargs or {}))
 
-    rom = build_rom(X_train, simulation_dir, **(rom_kwargs or {}))
+    rom = build_rom(X_train, simulation_dir, cfg=cfg, N_val=(data_kwargs or {}).get('N_val'),
+                    **(rom_kwargs or {}))
     if N_sensors is not None:
         rom = rom.copy()
-        rom.select_sensors(N_sensors=N_sensors,
-                           domain_of_measurement=[4, 7, -1, 1],   # x_min, x_max, y_min, y_max (wake)
-                           down_sample_measurement=(10, 10),
-                           qr_selection=True)
-    truth = build_truth(rom, X_filter, X_filter_true, **(truth_kwargs or {}))
-    ensemble = build_ensemble(rom, da_method=da_method, **(ensemble_kwargs or {}))
+    if N_sensors == 0:
+        rom.select_sensors(measure_modes=True)
+    elif N_sensors is not None:
+        rom.select_sensors(N_sensors=N_sensors, **{**SENSORS, **cfg.get('sensors', {})})
+    truth = build_truth(rom, X_filter, X_filter_true, cfg=cfg, **(truth_kwargs or {}))
+    ensemble = build_ensemble(rom, da_method=da_method, cfg=cfg, **(ensemble_kwargs or {}))
 
     if t_extra is None:
         t_extra = 2. * rom.t_CR
 
     filter_ens = run_da_loop(ensemble, truth,
-                             std_obs=CFG['da']['std_obs'] if std_obs is None else std_obs,
+                             std_obs=cfg['da']['std_obs'] if std_obs is None else std_obs,
                              t_extra=t_extra)
-    return filter_ens, truth, ensemble_metrics(filter_ens, truth)
+    out = filter_ens, truth, ensemble_metrics(filter_ens, truth)
+    return (*out, rom, (X_filter, X_filter_true)) if return_case else out
 
 
 # --------------------------------------- Main ---------------------------------------- #

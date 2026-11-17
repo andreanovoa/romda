@@ -9,7 +9,8 @@ and reduced-order-model concepts (3) combined with DA in real time (4). Read the
 order. Each topic has a companion in [`scripts/`](../scripts/README.md), which runs the same
 experiments from the command line: [`lorenz/`](../scripts/examples/lorenz/README.md) for topic 1,
 [`thermoacoustics/`](../scripts/thermoacoustics/README.md) for topic 2 and
-[`podesn_cylinder/`](../scripts/podesn_cylinder/README.md) for topics 3 and 4.
+[`podesn_cylinder/`](../scripts/podesn_cylinder/README.md) for topics 3 and 4, and
+[`caeesnda/`](../scripts/caeesnda/README.md) for notebooks 45 and 46.
 
 ### Repo-specific tutorials [0x]
 - [x] 00 - Class Model
@@ -53,29 +54,5 @@ experiments from the command line: [`lorenz/`](../scripts/examples/lorenz/README
 ### Real-time data assimilation on reduced-order models [4x]
 
 * [x] 44 - Real-time DA on the POD-ESN cylinder-wake model ([Nóvoa & Magri 2025](https://doi.org/10.1007/978-3-031-97567-7_5))
-
-****
-****
-
-# Running the tutorials as tests
-`test_tutorials.py` (in this folder) executes the notebooks through pytest, e.g.:
-
-```bash
-SUBFOLDERS='["0","1"]' python -m pytest -s --log-cli-level=INFO tutorials/test_tutorials.py  # from the repository root
-```
-
-Configuration via environment variables:
-- `SUBFOLDERS` — categories to run, e.g. `'["0","1"]'` (default: all, `'["0","1","2","3","4"]'`)
-- `NB_TEST_QUICK=1` — skip notebooks containing training or animation cells
-- `NB_TEST_TIMEOUT` — per-notebook timeout in seconds (default: 600)
-- `NB_TEST_FOLDER` — notebook folder to test (default: this folder)
-
-These tests are not part of the main suite (`pytest` collects `tests/` only) — invoke
-`tutorials/test_tutorials.py` explicitly. Notebooks 22, 31, 35 and 44 download datasets
-from Zenodo on first run.
-
-To (re-)execute a single notebook in place:
-```bash
-cd tutorials/1_Introduction_to_real-time_DA
-jupyter nbconvert --to notebook --execute --inplace 10_real-time-DA_intro.ipynb
-```
+* [x] 45 - Real-time DA with the convolutional autoencoder echo state network (CAE-ESN) on the Kuramoto–Sivashinsky equation ([Özalp, Nóvoa & Magri 2026](https://doi.org/10.1016/j.cma.2025.118600))
+* [x] 46 - Real-time DA with the CAE-ESN on the Kolmogorov flow (the record, computed with jax-cfd, is not distributed)

@@ -1,5 +1,33 @@
 # Changelog
 
+## 4.1.0 (2026-11-17)
+
+### Added
+
+- The convolutional autoencoders `CAE`, `CAE1D` and `MultiScaleCAE`, and the CAE-ESN reduced-order models
+  `CAE_ESN`, `CAE1D_ESN` and `MultiScaleCAE_ESN` (Racca, Doan & Magri 2023; Özalp, Nóvoa & Magri 2026), are public.
+  They need torch, the optional extra `romda[torch]`; `import romda` does not import it.
+- Tutorial `45_DA_CAE_ESN_KS`: real-time data assimilation with the CAE-ESN on the Kuramoto–Sivashinsky equation,
+  with the autoencoder weights of Özalp, Nóvoa & Magri (2026).
+- `scripts/caeesnda/`: the CAE-ESN cases `ks.yml` and `kolmogorov.yml`, run by `cae_esn_da.py`.
+- `scripts/podesn_cylinder/iccs2025.py` and `iccs2025.yml`: Figs. 3–5 of Nóvoa & Magri (2025) with the current
+  code. `pod_esn.run_experiment` takes a configuration (`cfg`), measures the POD coefficients with `N_sensors=0`,
+  and names the cached network after a digest of its options.
+- Documentation: the page *Replications* sets the figures of the replication of Nóvoa & Magri (2025) beside the
+  conclusions of the paper.
+
+### Changed
+
+- The Kolmogorov CAE-ESN tutorial is renamed `46_DA_CAE_ESN_Kolmogorov` and is public. Its record, computed with
+  jax-cfd, is not distributed; the notebook reads it from `$DATA_ROOT`.
+- `tutorials/README.md` lists the tutorials only; the notes on running them as tests are in the docstring of
+  `tutorials/test_tutorials.py`.
+- The figures of the documentation site follow its colour scheme: the build makes the white background of every
+  PNG transparent, and `docs/stylesheets/figures.css` inverts the colours in the dark scheme. The class
+  `no-invert` keeps the colours of an image.
+- The documentation site renders every tutorial of topics 3 and 4 as a page with its saved outputs, instead of
+  linking to the notebook on GitHub.
+
 ## 4.0.0 (2026-11-15)
 
 ### Changed

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "romda"
-version = "4.0.0"
+version = "4.1.0"
 description = "Real-time reduced-order modelling and bias-aware data assimilation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,6 +45,11 @@ dev = [
     "pytest>=9.0.3",  # CVE-2025-71176 (predictable /tmp handling)
     "ruff>=0.11.5",  # CVE-2025-4574 (crossbeam-channel double-free)
 ]
+# torch autoencoders and the CAE-ESNs (CAE, CAE1D, MultiScaleCAE, CAE_ESN, CAE1D_ESN,
+# MultiScaleCAE_ESN); POD, SPOD and the ESN do not need it.
+torch = [
+    "torch>=2.6.0",  # CVE-2025-32434 (critical RCE via torch.load)
+]
 notebooks = [
     "ipykernel>=6.30",
     "ipywidgets>=8.1",
@@ -61,7 +66,7 @@ Issues = "https://github.com/andreanovoa/romda/issues"
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "scripts/esnda", "scripts/thermoacoustics/jfm2024",
+testpaths = ["tests", "scripts/esnda", "scripts/thermoacoustics/jfm2024", "scripts/thermoacoustics/cmame2023",
              "dev/esn_da/test_esn_da.py", "dev/cae_esn_kolmogorov/test_ablations.py"]   # private paths: absent, skipped
 addopts = [
     "-v",

@@ -4,6 +4,8 @@ A projector maps a flow field to a small set of reduced coordinates and back. Ev
 shares the `fit` / `encode` / `decode` interface of `Projector`, so a reduced-order model can
 swap one projector for another. This page covers the linear projectors, `POD` and `SPOD`, and
 the standalone decomposition functions in `pod_utils`, which include the frequency-domain SPOD.
+The nonlinear projectors, the convolutional autoencoders, are on the page
+[Convolutional autoencoders](convolutional_autoencoders.md).
 
 **Files:** `src/romda/models/data_driven/autoencoders/base.py` (the interface),
 `pod.py` (`POD`, `SPOD`) and `pod_utils.py` (the decomposition algorithms).

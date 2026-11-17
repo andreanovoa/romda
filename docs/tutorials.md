@@ -3,8 +3,7 @@
 The tutorial notebooks below build up from the basic classes to full real-data digital
 twins, numbered by topic. The source lives in
 [`tutorials/`](https://github.com/andreanovoa/romda/tree/main/tutorials).
-Topics 0 and 1, and the POD / POD-ESN notebooks of topic 3, are rendered inline (with
-saved outputs); the rest link out to GitHub for now. Two arcs run through them: DA
+Every notebook is rendered on this site with its saved outputs. Two arcs run through them: DA
 concepts (1) applied to physical models (2), and reduced-order-model concepts (3)
 combined with DA in real time (4).
 
@@ -48,7 +47,9 @@ combined with DA in real time (4).
 
 | Notebook | Contents |
 | --- | --- |
-| [Real-time DA with POD-ESN](https://github.com/andreanovoa/romda/blob/main/tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.ipynb) | Assimilating sparse sensors into the POD-ESN wake model.* |
+| [Real-time DA with POD-ESN](tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md) | Assimilating sparse sensors into the POD-ESN wake model.* |
+| [Real-time DA with CAE-ESN, Kuramoto–Sivashinsky](tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md) | A one-dimensional convolutional autoencoder and an echo state network (`CAE1D_ESN`) as the forecast model of an ensemble filter on the Kuramoto–Sivashinsky equation. Runs end to end; needs the `torch` extra. |
+| [Real-time DA with CAE-ESN, Kolmogorov flow](tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md) | The multi-scale CAE-ESN (`MultiScaleCAE_ESN`) on the vorticity of the two-dimensional Kolmogorov flow. Needs the `torch` extra and a jax-cfd record of the flow, which is not distributed. |
 
 
 \* These notebooks download their dataset from [Zenodo](https://zenodo.org/) on first use ([annular data](https://zenodo.org/records/15609832), [wake data](https://zenodo.org/records/15623774)).

@@ -1,4 +1,25 @@
-"""Execute the tutorial notebooks headlessly (see README.md for the environment variables)."""
+"""Execute the tutorial notebooks headlessly, with plotting disabled.
+
+Run from the repository root, e.g.
+
+    SUBFOLDERS='["0","1"]' python -m pytest -s --log-cli-level=INFO tutorials/test_tutorials.py
+
+Environment variables:
+  SUBFOLDERS       topic folders to run, e.g. '["0","1"]' (default: all, '["0","1","2","3","4"]')
+  NB_TEST_QUICK=1  skip the notebooks with training or animation cells
+  NB_TEST_TIMEOUT  timeout per notebook in seconds (default: 600)
+  NB_TEST_FOLDER   notebook folder to test (default: this folder)
+
+These tests are not part of the main suite (`pytest` collects `tests/` only): invoke this file
+explicitly. Notebooks 22, 31, 35 and 44 download datasets from Zenodo on first run; 45 integrates
+the Kuramoto-Sivashinsky equation and needs torch; 46 needs torch and the Kolmogorov record
+(jax-cfd, not distributed) in $DATA_ROOT/Kolmogorov/jax-cfd/.
+
+To execute a single notebook in place:
+
+    cd tutorials/1_Introduction_to_real-time_DA
+    jupyter nbconvert --to notebook --execute --inplace 10_real-time-DA_intro.ipynb
+"""
 import json
 import os
 from pathlib import Path

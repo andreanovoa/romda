@@ -11,7 +11,13 @@ README of each topic lists the published works that it supports.
 | [`lorenz/`](https://github.com/andreanovoa/romda/tree/main/scripts/examples/lorenz) | `lorenz63`, `lorenz96` | Twin experiments on chaotic systems: stochastic and square-root EnKF, combined state and parameter estimation, the rBA-EnKF on biased observations. |
 | [`thermoacoustics/`](https://github.com/andreanovoa/romda/tree/main/scripts/thermoacoustics) | `annular`, `rijke`, `vdp` | Twin experiments on the Rijke tube and the Van der Pol oscillator, and the real-time digital twin of raw experimental data from an annular combustor. |
 | [`podesn_cylinder/`](https://github.com/andreanovoa/romda/tree/main/scripts/podesn_cylinder) | `pod_esn` | Real-time data assimilation with a POD-ESN reduced-order model of the cylinder wake, with online learning of the ESN output weights. |
+| [`caeesnda/`](https://github.com/andreanovoa/romda/tree/main/scripts/caeesnda) | `ks`, `kolmogorov` | Real-time data assimilation with the convolutional autoencoder echo state network (CAE-ESN) of Özalp, Nóvoa & Magri (2026), on the Kuramoto–Sivashinsky equation and the Kolmogorov flow. Both run through `python scripts/caeesnda/cae_esn_da.py <case>` and need torch. `ks.yml` integrates its record with dynamodels and loads the autoencoder of the paper; `kolmogorov.yml` reads a jax-cfd record from `$DATA_ROOT`, which is not distributed with romda. |
 | [`esnda/`](https://github.com/andreanovoa/romda/tree/main/scripts/esnda) | scripts of a paper | Washout-free deployment of echo state networks with ensemble filters on the Lorenz-63 and Lorenz-96 systems: synchronization, parameter estimation, localization with parallel networks and uncertainty quantification, with the trained networks of the paper. |
+
+Two published works are replicated with the current code, each with a page that sets the figures beside the
+conclusions of the paper:
+
+- [Nóvoa & Magri (2025), ICCS](replications/iccs2025.md): online learning of a POD-ESN of the cylinder wake.
 
 Install `romda` in editable mode from a clone of the repository, and run the commands from its root:
 
@@ -53,6 +59,7 @@ The scripts of the cases add the figures, for example:
 python scripts/examples/lorenz/lorenz63.py --save-figs
 python scripts/run_config.py thermoacoustics/vdp --save-figs
 python scripts/podesn_cylinder/pod_esn.py --save-figs
+python scripts/caeesnda/cae_esn_da.py ks --save-figs
 ```
 
 The annular and cylinder cases download their data on first use, into `data/` at the repository root.
@@ -67,6 +74,8 @@ The annular and cylinder cases download their data on first use, into `data/` at
 | `scripts/thermoacoustics/rijke.yml` | Rijke-tube twin |
 | `scripts/thermoacoustics/annular.yml` | Annular experimental data |
 | `scripts/podesn_cylinder/pod_esn.yml` | POD-ESN cylinder wake (through its script only) |
+| `scripts/caeesnda/ks.yml` | CAE-ESN, Kuramoto–Sivashinsky equation (through its script only) |
+| `scripts/caeesnda/kolmogorov.yml` | CAE-ESN, Kolmogorov flow; the jax-cfd record is not distributed (through its script only) |
 
 The Python API returns the filtered ensemble, truth observations, and a metrics dictionary,
 which can be used to create custom plots or further analysis.

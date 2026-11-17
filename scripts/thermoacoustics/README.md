@@ -17,6 +17,7 @@ unsteady heat release in combustors.
   raw data. `annular.yml` holds the settings of Nóvoa, Noiray, Dawson & Magri (2024) at an equivalence ratio
   of 0.5125, and `annular_release.yml` those of the tutorial `32_DA_annular_raw` of the release v1.0.
 
+
 ## Published works
 
 - Nóvoa, Noiray, Dawson & Magri (2024). A real-time digital twin of azimuthal thermoacoustic

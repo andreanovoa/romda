@@ -19,7 +19,7 @@ authors:
     affiliation: "Imperial College London"
   - family-names: "Eze"
     given-names: "Ben"
-version: 4.0.0
+version: 4.1.0
 license: MIT
 repository-code: "https://github.com/andreanovoa/romda"
 url: "https://andreanovoa.github.io/romda/"

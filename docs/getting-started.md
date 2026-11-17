@@ -22,6 +22,15 @@ conda activate romda
 pip install -e ".[dev,notebooks]" --use-pep517
 ```
 
+The convolutional autoencoders and the CAE-ESN reduced-order models (`CAE`, `CAE1D`, `MultiScaleCAE`, `CAE1D_ESN` and `MultiScaleCAE_ESN`) need PyTorch, the optional extra `torch`; POD, SPOD, the echo state network and `POD_ESN` do not:
+
+```bash
+pip install "romda[torch]"              # from PyPI
+pip install -e ".[torch]" --use-pep517  # from a source checkout
+```
+
+Extras combine, e.g. `".[torch,dev,notebooks]"`.
+
 
 ## Quick example
 

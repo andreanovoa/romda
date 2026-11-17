@@ -108,6 +108,7 @@ multiprocessing pool, so, in a script, keep the code under `if __name__ == "__ma
    * `LatentROM` — base class of the reduced-order models that pair a projector with a forecaster, such as `POD_ESN`
    * `LinearModel` — linear map with process noise (Kalman-filter tutorials)
    * Projectors ([`autoencoders/`](src/romda/models/data_driven/autoencoders/)): `POD`, `SPOD` — (Spectral) Proper Orthogonal Decomposition (Sieber 2016, Towne 2018)
+   * Convolutional autoencoders `CAE`, `CAE1D`, `MultiScaleCAE`, and the CAE-ESN reduced-order models `CAE_ESN`, `CAE1D_ESN`, `MultiScaleCAE_ESN` (Racca, Doan & Magri 2023; Özalp, Nóvoa & Magri 2026); they need the optional extra `romda[torch]`
 
    Reservoir core: `ESN_model` subclasses `EchoStateNetwork` of the external [`echostatenetwork`](https://github.com/andreanovoa/EchoStateNetwork) package; `pod_utils` (in `autoencoders/`) holds the standalone POD/SPOD algorithms
 

@@ -157,7 +157,42 @@ def _build_ensemble(model_class, cfg, truth, truth_cfg, method=None, overrides=N
             reference.integrator = INTEGRATORS[integrator](reference)
         draw_state_after_spinup(model, reference, spinup_cr, std_phi=params.get('std_phi', 0.001),
                                 distribution_phi=params.get('distribution_phi', 'normal'))
+    reflect_into_limits(model)
     return ensemble
+
+
+def reflect_into_limits(model):
+    """Reflect the parameters of the initial ensemble of `model` that lie outside the limits of the model
+    (``alpha_lims``) about the limit that they cross, e.g. 5.6 becomes 4.4 for an upper limit of 5; a member that
+    is still outside after the reflection is set on the limit. An analysis with a parameter outside its limits is
+    rejected and the forecast is kept, so an ensemble that starts with one member outside is never analysed unless
+    one analysis brings every member inside: a normal prior (``distribution_alpha: normal``) has such members
+    whenever a limit is within a few standard deviations of its mean. The code of Nóvoa et al. (2023) assimilated
+    the crossed limit as an observation instead. An ensemble within the limits is left as it is.
+
+    Returns
+    -------
+    int
+        The number of parameter members that were moved.
+    """
+    if not model.est_alpha:
+        return 0
+    state, moved = np.array(model.current_state), 0
+    for k, name in enumerate(model.est_alpha):
+        low, high = model.alpha_lims.get(name, (None, None))
+        row = state[model.Nphi + k]
+        low, high = -np.inf if low is None else low, np.inf if high is None else high
+        outside = (row < low) | (row > high)
+        if outside.any():
+            below, above = row < low, row > high
+            reflected = np.where(below, 2 * low - row, np.where(above, 2 * high - row, row))
+            # a reflection that crosses the other limit: on the limit that the member crossed
+            reflected = np.where(below & (reflected > high), low, np.where(above & (reflected < low), high, reflected))
+            state[model.Nphi + k] = reflected
+            moved += int(outside.sum())
+    if moved:
+        model.update_history(psi=state[np.newaxis], t=model.hist_t[[0]], reset=True)
+    return moved
 
 
 def draw_state_after_spinup(model, reference, spinup_cr=1., std_phi=0.001, distribution_phi='normal'):
@@ -197,6 +232,18 @@ def _training_data_key(truth, params):
     return f'{record}_t{truth.t_true[-1]:.4g}_{digest}'
 
 
+def _twin_data_key(truth, params):
+    """What the bias training data of a twin experiment depend on besides the shape of the bias, for the name of
+    their cache: the truth (its model and parameters, in ``name_truth``), the end of its record (the data are
+    its last steps), the ranges that the training members are drawn from and the options of `_DATA_OPTIONS`.
+    The trained network is stored under a hash of this name, so that a second number of training members ``L``,
+    a second truth or a second set of ranges does not load the network of the first."""
+    options = {key: params.get(key) for key in ('std_alpha', 'std_phi')}
+    options.update({key: params[key] for key in _DATA_OPTIONS if key in params})
+    options.update(truth=truth.name_truth, t_end=f'{truth.t_true[-1]:.4g}')
+    return hashlib.sha256(json.dumps(convert_to_python_type(options), sort_keys=True).encode()).hexdigest()[:8]
+
+
 def _build_bias(cfg, ensemble, truth, model_class, experimental=False, overrides=None, data_options=None,
                 truth_cfg=None):
     params = {**(cfg or {}), **(overrides or {})}
@@ -219,7 +266,7 @@ def _build_bias(cfg, ensemble, truth, model_class, experimental=False, overrides
         params.setdefault('t_val', model_class.t_CR * 2)
         tag = f'ESN_train_data_{name}_raw_{_training_data_key(reference, {**params, **(data_options or {})})}'
     else:
-        tag = f'ESN_train_data_{name}_{truth.name_bias}'
+        tag = f'ESN_train_data_{name}_{truth.name_bias}_{_twin_data_key(truth, {**params, **(data_options or {})})}'
     results_folder = set_working_directories(name)[1]
     os.makedirs(results_folder, exist_ok=True)
     params.setdefault('N_ens', ensemble.m)        # one bias state for each member; N_ens: 1 carries their mean

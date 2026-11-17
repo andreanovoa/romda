@@ -294,10 +294,13 @@ def build_rom(name, X_train):
 
     common = dict(data=X_train, dt=DT, domain=DOMAIN, Nq=3, qr_selection=True,
                   t_train=200 * DT, t_val=40 * DT, **ESN_KW)
+    if name == 'CAE_ESN':
+        return dd.CAE_ESN(n_latent=4, channels=(4, 8), projector_epochs=30, val_fraction=0.1, **common)
     return dd.POD_ESN(N_modes=4, **common)
 
 
 @pytest.mark.parametrize('name', ['POD_ESN',
+                                  pytest.param('CAE_ESN', marks=needs_torch),
                                   ])
 def test_rom_runs_through_the_da_loop(name):
     X = wake_like_field()

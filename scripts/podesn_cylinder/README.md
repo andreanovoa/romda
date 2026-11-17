@@ -23,7 +23,8 @@ number of sensors, the covariance inflation and the online estimation of the out
   *Computational Science – ICCS 2025 Workshops*, Lecture Notes in Computer Science 15910, 57–64.
   [doi:10.1007/978-3-031-97567-7_5](https://doi.org/10.1007/978-3-031-97567-7_5),
   [arXiv:2504.16767](https://arxiv.org/abs/2504.16767). The code of the paper is the release
-  [v1.1](https://github.com/andreanovoa/romda/releases/tag/v1.1).
+  [v1.1](https://github.com/andreanovoa/romda/releases/tag/v1.1); `iccs2025.py` replicates its Figs. 3–5 with
+  the current code (see [Replication of the paper](#replication-of-the-paper)).
 
 This case accompanies the tutorials `31_POD_SPOD.ipynb`, `35_POD_ESN_cylinder.ipynb` and
 `44_DA_POD_ESN_cylinder.ipynb` (topics 3 and 4 of the [tutorials](../../../tutorials/README.md)).
@@ -60,10 +61,48 @@ python scripts/podesn_cylinder/sweeps.py --study sensors --quick
 | `inflation` | multiplicative inflation factor | the periodic wake keeps the spread of the ensemble small, and inflation counteracts its collapse |
 | `wout_estimation` | state only against state and `Wout`, over the prior uncertainty of the weights `std_alpha` | whether the online update of the output weights compensates for the noisy training data |
 
+## Replication of the paper
+
+`iccs2025.py` makes Figs. 3–5 of Nóvoa & Magri (2025) with the settings of `iccs2025.yml`:
+
+```bash
+python scripts/podesn_cylinder/iccs2025.py --save-figs
+```
+
+| Setting | Value | Source |
+|---|---|---|
+| Noise of the snapshots | Gaussian, standard deviation 0.1 of the maximum velocity, smoothed by a Gaussian kernel of standard deviation 0.1 | paper |
+| POD modes, reservoir size | 4, 40 | paper |
+| Training snapshots | 250 (Figs. 3–4) and 90 (Fig. 5); the last tenth validates the network | paper; v1.1 |
+| Spectral radius, input scaling | 0.976, 0.890, fixed; the Tikhonov factor is searched | paper |
+| Filter, ensemble size | EnSRKF; 10 (Figs. 3–4) and 50 (Fig. 5) | paper; v1.1 for Fig. 4 |
+| Time steps between observations | 25 (Figs. 3–4); 10, 20 and 30 (Fig. 5) | paper; v1.1 for Fig. 4 |
+| Sensors | 1 to 4 by QR pivoting in the wake, $4 \leq x \leq 7$, $|y| \leq 1$, and the full fields through their POD coefficients | paper; v1.1 for the region |
+| Observation error, prior of the singular values of `Wout` | 0.01, 0.1 | v1.1 |
+| Assimilation window | from $t = 0.5$ to $t = 5$, then a forecast of 0.5 | v1.1 |
+
+The error is the mean squared error of the reconstructed velocity fields with respect to the noise-free fields
+(Eq. 5 of the paper). The conclusions of the paper hold with the current code.
+
+1. Fig. 3: with one sensor, the two-fold estimation (POD coefficients and reservoir state) brings the error below
+   that of the noisy data at the first observation, and one order of magnitude below it within four observations.
+   The estimation of the POD coefficients alone needs about eight observations to stay below the error of the data.
+2. Fig. 4: with the full fields, the error falls to its final level at the first observation. With one to four
+   sensors, the ensemble converges to the same level within five observations.
+3. Fig. 5: with the network trained on 90 snapshots, the two-fold estimation does not prevent the forecast from
+   drifting, and the final error exceeds that of the noisy data in 4 of the 15 cases. The three-fold estimation, which
+   also updates the singular values of `Wout`, keeps the final error below that of the data in the 15 cases.
+
+The curves are not those of the paper digit for digit, for three reasons: (i) the random matrices of the network
+and the realization of the noise differ from those of v1.1; (ii) the members start from reservoir states visited in
+training (`ESN_model.init_ensemble`), whereas v1.1 perturbed the state after a transient; and (iii) the stride of
+the candidate sensor locations follows the v1.1 call, whose axis order is assumed.
+
 ## Outputs
 
 In this folder, not tracked by git:
 
-- `figs/`: the figures of the case (`cylinder_01.png`, ...) and of the sweep (`cylinder_<study>.png`);
-- `results/`: the filtered ensembles of both runs (`cylinder_main_results`) and the records of the sweep
-  (`cylinder_<study>.jsonl`).
+- `figs/`: the figures of the case (`cylinder_01.png`, ...), of the sweep (`cylinder_<study>.png`) and of the
+  replication (`iccs2025_fig3.png`, ...);
+- `results/`: the filtered ensembles of both runs (`cylinder_main_results`), the records of the sweep
+  (`cylinder_<study>.jsonl`) and the errors of each run of the replication (`iccs2025/`).

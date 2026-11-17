@@ -20,13 +20,14 @@ All use `IVPIntegrator` (scipy `solve_ivp`) except KS.
 
 #### Data-driven models — `src/romda/models/data_driven/`
 
-All use `DiscreteIntegrator`. The ML base classes `EchoStateNetwork` (from the external `echostatenetwork` package) and the `Projector` hierarchy (`POD`/`SPOD`, in `src/romda/models/data_driven/autoencoders/` — see [Data-driven models](api/models_data_driven.md)) are mixed in via multiple inheritance.
+All use `DiscreteIntegrator`. The ML base classes `EchoStateNetwork` (from the external `echostatenetwork` package) and the `Projector` hierarchy (`POD`/`SPOD` and the convolutional autoencoders `CAE`/`CAE1D`/`MultiScaleCAE`, in `src/romda/models/data_driven/autoencoders/` — see [Data-driven models](api/models_data_driven.md)) are mixed in via multiple inheritance.
 
 | Class | Key parameters | Notes |
 |---|---|---|
 | `ESN_model` | `N_units`, `rho`, `sigma_in`, `N_wash` | Inherits `EchoStateNetwork`; requires training `data` at init |
 | `LatentROM` | `Nq`, `measure_modes`, `qr_selection`, `sensor_locations` | Base of every projector + forecaster ROM: fits the projector, trains the forecaster on the latent trajectory, places sensors by QR on the decoder Jacobian |
 | `POD_ESN` | `N_modes`, `sensor_locations` | `LatentROM` + `ESN_model` + `POD`; sensor placement via QR on `Psi` |
+| `CAE_ESN`, `CAE1D_ESN`, `MultiScaleCAE_ESN` | `n_latent`, `channels` / `kernel_sizes`, `projector`, `projector_epochs` | The CAE-ESN: `LatentROM` + `ESN_model` + `CAE`/`CAE1D`/`MultiScaleCAE` (optional extra `torch`); see [Latent reduced-order models](api/models_data_driven_latent_roms.md) and [Convolutional autoencoders](api/convolutional_autoencoders.md) |
 | `LinearModel` | `F` (transition matrix), `Q_noise` | $\vect{\psi}_{t+1} = \matr{F}\vect{\psi}_t + \vect{\eta}_t$ |
 
 

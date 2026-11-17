@@ -1,0 +1,47 @@
+# Real-time DA with the CAE-ESN on the Kolmogorov flow (Re = 30, 48 x 48, vorticity), the case of tutorial 46.
+# Run by scripts/caeesnda/cae_esn_da.py. The record was computed with jax-cfd and is not distributed with romda:
+# the script reads it from $DATA_ROOT/<forecast.record.path>.
+name: kolmogorov
+
+forecast:
+  kind: cae_esn
+  t_lyap: 20.                     # 1 / lambda_1
+  record:
+    source: h5
+    path: Kolmogorov/jax-cfd/Kolmogorov_Re30_drag0.0_jaxcfd_res48.h5
+    dataset: vorticity
+    dt: 0.1
+    N_trans: 1000
+    N_train: 50000
+    N_val: 20000                  # validation snapshots of the autoencoder; the ESN validates on the last 1000 training ones
+    N_test: 5000
+  projector:                      # MultiScaleCAE trained in romda on this record with the settings of the paper
+    class: MultiScaleCAE
+    weights: tutorials/weights/MultiScaleCAE_kolmogorov_re30_r16   # .json options + .npz arrays
+  rom:
+    class: MultiScaleCAE_ESN
+    n_sensors: 36                 # a regular 6 x 6 grid
+  esn:                            # the hyperparameters of the paper
+    N_units: 5000
+    N_wash: 100
+    N_val: 1000
+    rho: 0.1
+    sigma_in: 0.8
+    tikh: 1.0e-10
+    Win_type: dense
+    norm_method: std
+    connect: 10
+    noise: 1.0e-3
+    seed: 0
+  t_extra_lyap: 5
+
+truth:
+  noise_type: std                 # standard deviation: noise_level x the standard deviation at each sensor
+  noise_level: 0.1
+  Nt_obs: 10
+  window_lyap: 5
+  seed: 1
+
+da:
+  method: EnKF
+  m: 50

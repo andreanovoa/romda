@@ -11,11 +11,13 @@ experimental data in real time. It provides:
   linear Kalman filter.
 - **Forecast models** — physical low-order models (Rijke tube, azimuthal
   thermoacoustics, Van der Pol, Lorenz 63/96, Kuramoto–Sivashinsky) and data-driven
-  reduced-order models (Echo State Networks and POD-ESN).
+  reduced-order models (echo state networks, POD-ESN and the convolutional autoencoder
+  echo state network, CAE-ESN).
 - **Bias estimators** — interchangeable models of the (unknown) model bias: an ESN
   estimator, a constant (persistent) bias, and a zero-bias placeholder.
-- **Modal decompositions** — POD and spectral POD (Sieber 2016 and Towne 2018) with an
-  sklearn-style `fit` / `encode` / `decode` interface.
+- **Projectors** — POD and spectral POD (Sieber 2016 and Towne 2018), and convolutional
+  autoencoders (optional extra `torch`), with one sklearn-style `fit` / `encode` / `decode`
+  interface.
 
 <figure markdown>
   ![Real-time bias-aware DA](figs/DA/wBADA.gif){ width="700" }

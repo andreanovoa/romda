@@ -7,10 +7,11 @@ coefficients, with a forecaster, which advances those coefficients in time:
     rnns/           forecasters: ESN_model (and its config store)
     latent_rom.py   LatentROM, the base class every ROM shares
     pod_esn.py      POD_ESN
+    autoencoder_roms.py  CAE_ESN, CAE1D_ESN and MultiScaleCAE_ESN, the CAE-ESNs (torch)
 
 Every ROM is a `dynamodels.Model`, so it is a forecast model for romda's
-estimators. Importing this package imports neither torch nor JAX: the classes
-that need them load on first access.
+estimators. Importing this package does not import torch: the classes that
+need it (the optional extra `romda[torch]`) load on first access.
 """
 
 import importlib
@@ -49,8 +50,12 @@ _LAZY: dict[str, str] = {
     'auto_load_or_create': '.model_config',
     'save_model_to_config': '.model_config',
     'load_model_from_config': '.model_config',
+    # the CAE-ESNs, among them those of Racca, Doan & Magri (2023) and Özalp, Nóvoa & Magri (2026); torch
+    'CAE_ESN': '.autoencoder_roms',
+    'CAE1D_ESN': '.autoencoder_roms',
+    'MultiScaleCAE_ESN': '.autoencoder_roms',
 }
-__all__ += list(_LAZY)
+__all__ += [*_LAZY, *autoencoders._LAZY]
 
 
 

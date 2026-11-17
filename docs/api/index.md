@@ -14,4 +14,6 @@ unscented Kalman filters, ...) live in [`biasda`](https://github.com/andreanovoa
 - [Models — overview](models.md)
     - [Physical models](models_physical.md)
     - [Data-driven models](models_data_driven.md)
+        - [Convolutional autoencoders](convolutional_autoencoders.md)
+        - [Latent reduced-order models](models_data_driven_latent_roms.md)
 - [Observations](observations.md)
