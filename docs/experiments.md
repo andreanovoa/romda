@@ -17,8 +17,8 @@ README of each topic lists the published works that it supports.
 Two published works are replicated with the current code, each with a page that sets the figures beside the
 conclusions of the paper:
 
-- [Nóvoa & Magri (2025), ICCS](replications/iccs2025.md): online learning of a POD-ESN of the cylinder wake.
-- [Nóvoa, Racca & Magri (2023), CMAME](replications/cmame2023.md): regularized bias-aware EnKF in thermoacoustics.
+- [Nóvoa & Magri (2025), ICCS](tutorials/4_Real-time_DA_ROMs/47_Replication_ICCS2025.md): online learning of a POD-ESN of the cylinder wake.
+- [Nóvoa, Racca & Magri (2023), CMAME](tutorials/2_Real-time_DA_Thermoacoustics/23_Replication_CMAME2023.md): regularized bias-aware EnKF in thermoacoustics.
 
 Install `romda` in editable mode from a clone of the repository, and run the commands from its root:
 

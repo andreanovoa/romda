@@ -36,8 +36,8 @@ Select a topic to list its notebooks.
     | --- | --- |
     | [Rijke tube: model and DA](tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md) | The Rijke-tube low-order model, then twin state/parameter estimation with the EnKF. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_rijke.html). |
     | [TABADA Rijke (CMAME)](tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md) | Bias-aware DA on the Rijke tube with an ESN bias estimator. |
-    | [Replication: CMAME 2023](replications/cmame2023.md) | The main results of Nóvoa, Racca & Magri (2023) with the current code: the Van der Pol oscillator and the Rijke tube. |
     | [Annular combustor: model, data and digital twin](tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.md) | The annular-combustor low-order model, the experimental recordings, and a real-data digital twin with bias-aware DA. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_annular.html).* |
+    | [Replication: CMAME 2023](tutorials/2_Real-time_DA_Thermoacoustics/23_Replication_CMAME2023.md) | The main results of Nóvoa, Racca & Magri (2023) with the current code: the Van der Pol oscillator and the Rijke tube. |
 
 ??? abstract "3. Introduction to reduced-order models"
 
@@ -45,7 +45,6 @@ Select a topic to list its notebooks.
     | --- | --- |
     | [POD / SPOD](tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md) | POD, Sieber SPOD and Towne SPOD on the cylinder wake.* |
     | [POD-ESN on the cylinder wake](tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md) | The packaged `POD_ESN` reduced-order model at scale.* |
-    | [Replication: ICCS 2025](replications/iccs2025.md) | Figs. 3–5 of Nóvoa & Magri (2025) with the current code: online learning of the POD-ESN with an ensemble filter.* |
 
 ??? abstract "4. Real-time DA on reduced-order models"
 
@@ -54,6 +53,7 @@ Select a topic to list its notebooks.
     | [Real-time DA with POD-ESN](tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md) | Assimilating sparse sensors into the POD-ESN wake model.* |
     | [Real-time DA with CAE-ESN, Kuramoto–Sivashinsky](tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md) | A one-dimensional convolutional autoencoder and an echo state network (`CAE1D_ESN`) as the forecast model of an ensemble filter on the Kuramoto–Sivashinsky equation. Runs end to end; needs the `torch` extra. |
     | [Real-time DA with CAE-ESN, Kolmogorov flow](tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md) | The multi-scale CAE-ESN (`MultiScaleCAE_ESN`) on the vorticity of the two-dimensional Kolmogorov flow. Needs the `torch` extra and a jax-cfd record of the flow, which is not distributed. |
+    | [Replication: ICCS 2025](tutorials/4_Real-time_DA_ROMs/47_Replication_ICCS2025.md) | Figs. 3–5 of Nóvoa & Magri (2025) with the current code: online learning of the POD-ESN with an ensemble filter.* |
 
 
 \* These notebooks download their dataset from [Zenodo](https://zenodo.org/) on first use ([annular data](https://zenodo.org/records/15609832), [wake data](https://zenodo.org/records/15623774)).

@@ -109,6 +109,12 @@ def on_pre_build(config, **kwargs):
         shutil.rmtree(topic_dest, ignore_errors=True)
         topic_dest.mkdir(parents=True)
 
+    # Hand-written pages of a topic (e.g. the replications of published papers), named like
+    # the notebooks with a two-digit prefix, are copied next to the rendered notebooks.
+    for topic in RENDERED_TOPICS:
+        for md_path in sorted((SRC / topic).glob("[0-9][0-9]_*.md")):
+            shutil.copy(md_path, DEST / topic / md_path.name)
+
     for nb_path in nb_paths:
         nb = nbformat.read(nb_path, as_version=4)
         body, resources = exporter.from_notebook_node(

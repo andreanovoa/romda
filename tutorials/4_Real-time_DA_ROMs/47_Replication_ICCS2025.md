@@ -44,7 +44,7 @@ With one sensor, the two-fold estimation reaches an MSE of approximately $1.5 \t
 observations. The state estimation needs approximately eight observations to stay below the noisy data, because
 the analysis does not correct the reservoir state.
 
-![Figure 3 of the paper with the current code](../figs/replications/iccs2025/fig3.png)
+![Figure 3 of the paper with the current code](../../figs/replications/iccs2025/fig3.png)
 
 *Figure 3. MSE of the ten ensemble members with one sensor: (a) state estimation and (b) two-fold estimation.
 Vertical lines mark the observations.*
@@ -54,7 +54,7 @@ Vertical lines mark the observations.*
 The full fields converge at the first observation, and every case ends with an MSE between $1.4 \times 10^{-3}$ and
 $1.9 \times 10^{-3}$. One sensor placed by QR pivoting is therefore sufficient for the periodic wake.
 
-![Figure 4 of the paper with the current code](../figs/replications/iccs2025/fig4.png)
+![Figure 4 of the paper with the current code](../../figs/replications/iccs2025/fig4.png)
 
 *Figure 4. Two-fold estimation. (a) First POD coefficient when the full fields are observed, and (b) vertical
 velocity at the sensor when one sensor is observed (thin lines: ensemble members). (c) MSE of the ensemble members
@@ -66,7 +66,7 @@ With 90 training snapshots, the two-fold estimation ends above the noisy data in
 $5.3 \times 10^{-2}$), whereas the three-fold estimation does so in none (maximum $8.1 \times 10^{-3}$). The
 online update of the output weights compensates for the short training record.
 
-![Figure 5 of the paper with the current code](../figs/replications/iccs2025/fig5.png)
+![Figure 5 of the paper with the current code](../../figs/replications/iccs2025/fig5.png)
 
 *Figure 5. MSE of the ensemble mean with the network trained on 90 snapshots: (a–c) two-fold and (d–f) three-fold
 estimation, for 10, 20 and 30 time steps between observations (left to right).*
