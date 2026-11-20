@@ -7,49 +7,53 @@ Every notebook is rendered on this site with its saved outputs. Two arcs run thr
 concepts (1) applied to physical models (2), and reduced-order-model concepts (3)
 combined with DA in real time (4).
 
-## 0. How the repository works
+Select a topic to list its notebooks.
 
-| Notebook | Contents |
-| --- | --- |
-| [Class Model](tutorials/0_How_to_repo/00_Class_Model.md) | The `Model` base class, integrators and state history. |
-| [Class ESN_model](tutorials/0_How_to_repo/02_Class_ESN_model.md) | An ESN as a forecast model. |
-| [Class Observations](tutorials/0_How_to_repo/04_Class_Observations.md) | Truth generation, noise and manual biases. |
-| [Class Bias](tutorials/0_How_to_repo/05_Class_Bias.md) | Training and running an ESN bias estimator. |
-| [Class Estimator](tutorials/0_How_to_repo/06_Class_Estimator.md) | The `Estimator` hierarchy: instantiating a filter and running the forecast step. |
+??? abstract "0. How the repository works"
 
-## 1. Introduction to real-time DA
+    | Notebook | Contents |
+    | --- | --- |
+    | [Class Model](tutorials/0_How_to_repo/00_Class_Model.md) | The `Model` base class, integrators and state history. |
+    | [Class ESN_model](tutorials/0_How_to_repo/02_Class_ESN_model.md) | An ESN as a forecast model. |
+    | [Class Observations](tutorials/0_How_to_repo/04_Class_Observations.md) | Truth generation, noise and manual biases. |
+    | [Class Bias](tutorials/0_How_to_repo/05_Class_Bias.md) | Training and running an ESN bias estimator. |
+    | [Class Estimator](tutorials/0_How_to_repo/06_Class_Estimator.md) | The `Estimator` hierarchy: instantiating a filter and running the forecast step. |
 
-| Notebook | Contents |
-| --- | --- |
-| [Real-time DA intro](tutorials/1_Introduction_to_real-time_DA/10_real-time-DA_intro.md) | Bayesian estimation (MAP, univariate example) and the classical Kalman filter on a linear model. |
-| [Ensemble DA intro](tutorials/1_Introduction_to_real-time_DA/11_ensemble-DA_intro.md) | The EnKF: twin experiment on the Van der Pol model, and Monte Carlo convergence to the KF. |
-| [Augmented formulation](tutorials/1_Introduction_to_real-time_DA/13_real-time-DA-augmented-state.md) | Combined state and parameter estimation. |
-| [Chaos and DA (Lorenz 63)](tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md) | Ensemble DA on a chaotic system. |
-| [Model-bias-aware DA](tutorials/1_Introduction_to_real-time_DA/16_Bias-aware_real-time_DA.md) | The r-EnKF with an ESN bias estimator on the Van der Pol model. |
-| [Bimodal posterior (Gaussian mixture)](tutorials/1_Introduction_to_real-time_DA/17_Gaussian_mixture_ensemble_filter.md) | Lorenz-63 observed through $z$ alone: the bimodal posterior and the Gaussian-mixture ensemble filter. |
+??? abstract "1. Introduction to real-time DA"
 
-## 2. Real-time DA in thermoacoustics
+    | Notebook | Contents |
+    | --- | --- |
+    | [Real-time DA intro](tutorials/1_Introduction_to_real-time_DA/10_real-time-DA_intro.md) | Bayesian estimation (MAP, univariate example) and the classical Kalman filter on a linear model. |
+    | [Ensemble DA intro](tutorials/1_Introduction_to_real-time_DA/11_ensemble-DA_intro.md) | The EnKF: twin experiment on the Van der Pol model, and Monte Carlo convergence to the KF. |
+    | [Augmented formulation](tutorials/1_Introduction_to_real-time_DA/13_real-time-DA-augmented-state.md) | Combined state and parameter estimation. |
+    | [Chaos and DA (Lorenz 63)](tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md) | Ensemble DA on a chaotic system. |
+    | [Model-bias-aware DA](tutorials/1_Introduction_to_real-time_DA/16_Bias-aware_real-time_DA.md) | The r-EnKF with an ESN bias estimator on the Van der Pol model. |
+    | [Bimodal posterior (Gaussian mixture)](tutorials/1_Introduction_to_real-time_DA/17_Gaussian_mixture_ensemble_filter.md) | Lorenz-63 observed through $z$ alone: the bimodal posterior and the Gaussian-mixture ensemble filter. |
 
-| Notebook | Contents |
-| --- | --- |
-| [Rijke tube: model and DA](tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md) | The Rijke-tube low-order model, then twin state/parameter estimation with the EnKF. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_rijke.html). |
-| [TABADA Rijke (CMAME)](tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md) | Bias-aware DA on the Rijke tube with an ESN bias estimator. |
-| [Annular combustor: model, data and digital twin](tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.md) | The annular-combustor low-order model, the experimental recordings, and a real-data digital twin with bias-aware DA. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_annular.html).* |
+??? abstract "2. Real-time DA in thermoacoustics"
 
-## 3. Introduction to reduced-order models
+    | Notebook | Contents |
+    | --- | --- |
+    | [Rijke tube: model and DA](tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md) | The Rijke-tube low-order model, then twin state/parameter estimation with the EnKF. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_rijke.html). |
+    | [TABADA Rijke (CMAME)](tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md) | Bias-aware DA on the Rijke tube with an ESN bias estimator. |
+    | [Replication: CMAME 2023](replications/cmame2023.md) | The main results of Nóvoa, Racca & Magri (2023) with the current code: the Van der Pol oscillator and the Rijke tube. |
+    | [Annular combustor: model, data and digital twin](tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.md) | The annular-combustor low-order model, the experimental recordings, and a real-data digital twin with bias-aware DA. The model itself is covered in depth by the [`dynamodels` tutorial](https://andreanovoa.github.io/dynamodels/tutorials/tutorial_annular.html).* |
 
-| Notebook | Contents |
-| --- | --- |
-| [POD / SPOD](tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md) | POD, Sieber SPOD and Towne SPOD on the cylinder wake.* |
-| [POD-ESN on the cylinder wake](tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md) | The packaged `POD_ESN` reduced-order model at scale.* |
+??? abstract "3. Introduction to reduced-order models"
 
-## 4. Real-time DA on reduced-order models
+    | Notebook | Contents |
+    | --- | --- |
+    | [POD / SPOD](tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md) | POD, Sieber SPOD and Towne SPOD on the cylinder wake.* |
+    | [POD-ESN on the cylinder wake](tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md) | The packaged `POD_ESN` reduced-order model at scale.* |
+    | [Replication: ICCS 2025](replications/iccs2025.md) | Figs. 3–5 of Nóvoa & Magri (2025) with the current code: online learning of the POD-ESN with an ensemble filter.* |
 
-| Notebook | Contents |
-| --- | --- |
-| [Real-time DA with POD-ESN](tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md) | Assimilating sparse sensors into the POD-ESN wake model.* |
-| [Real-time DA with CAE-ESN, Kuramoto–Sivashinsky](tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md) | A one-dimensional convolutional autoencoder and an echo state network (`CAE1D_ESN`) as the forecast model of an ensemble filter on the Kuramoto–Sivashinsky equation. Runs end to end; needs the `torch` extra. |
-| [Real-time DA with CAE-ESN, Kolmogorov flow](tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md) | The multi-scale CAE-ESN (`MultiScaleCAE_ESN`) on the vorticity of the two-dimensional Kolmogorov flow. Needs the `torch` extra and a jax-cfd record of the flow, which is not distributed. |
+??? abstract "4. Real-time DA on reduced-order models"
+
+    | Notebook | Contents |
+    | --- | --- |
+    | [Real-time DA with POD-ESN](tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md) | Assimilating sparse sensors into the POD-ESN wake model.* |
+    | [Real-time DA with CAE-ESN, Kuramoto–Sivashinsky](tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md) | A one-dimensional convolutional autoencoder and an echo state network (`CAE1D_ESN`) as the forecast model of an ensemble filter on the Kuramoto–Sivashinsky equation. Runs end to end; needs the `torch` extra. |
+    | [Real-time DA with CAE-ESN, Kolmogorov flow](tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md) | The multi-scale CAE-ESN (`MultiScaleCAE_ESN`) on the vorticity of the two-dimensional Kolmogorov flow. Needs the `torch` extra and a jax-cfd record of the flow, which is not distributed. |
 
 
 \* These notebooks download their dataset from [Zenodo](https://zenodo.org/) on first use ([annular data](https://zenodo.org/records/15609832), [wake data](https://zenodo.org/records/15623774)).

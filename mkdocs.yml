@@ -80,8 +80,9 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Examples: experiments.md
-  - Replications:
+  - Published research with this package:
     - ICCS 2025, POD-ESN of the cylinder wake: replications/iccs2025.md
+    - CMAME 2023, regularized bias-aware EnKF: replications/cmame2023.md
   - Class hierarchy: class-hierarchy.md
   - API reference:
     - romda.models:

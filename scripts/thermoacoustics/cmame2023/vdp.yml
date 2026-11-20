@@ -1,0 +1,65 @@
+# Van der Pol twin experiment of Nóvoa, Racca & Magri (2023), section 6.2 and Table 3 (python -m romda.run, or
+# cmame2023/replicate.py for the figures). Where the paper is silent, the settings follow the code of the paper
+# (commit f557a3d of this repository, main_VdP.py); the README of this folder lists every choice.
+name: vdp_cmame2023
+
+truth:
+  model: VdP
+  params:
+    dt: 1.0e-4
+    law: tan
+    beta: 75.                   # the truth; the forecast model starts from 70, 60 and 4 (the defaults of VdP)
+    zeta: 55.
+    kappa: 3.4
+  window: [2.0, 3.0, 4.5]       # t_start, t_stop, t_max [s]; the network is trained on the end of the record
+  t_min: 1.98                   # the clock of the experiment starts here: the ensemble is drawn at t = 1.98 s
+  Nt_obs: 30
+  manual_bias: cosine           # b = cos(eta)
+  add_noise: true
+  noise_type: 'gauss, mult'     # d = (eta + b) (1 + epsilon), as the code of the paper
+  noise_level: 0.01
+
+forecast:
+  kind: physical
+
+da:
+  method: rBA_EnKF
+  std_obs: 0.01                 # Cdd = 0.01 max|d|^2 I (a fraction of a variance, as the code of the paper)
+  bias_regularization: 0.
+  m: 10
+  std_phi: 0.25
+  spinup_cr: 49.5               # ... about the state of the model with the prior parameters after 1.98 s
+  distribution_alpha: normal    # normal, mean (70, 60, 4) and standard deviation 25 % of the mean:
+  std_alpha:                    # [mean - 2 sigma, mean + 2 sigma]
+    beta: [35., 105.]
+    zeta: [30., 90.]
+    kappa: [2., 6.]
+  inflation: 1.002
+  inflation_factor_rejection: 1.002
+
+bias:                           # ESN bias estimator, Table 3
+  N_ens: 1                      # one bias state, that of the ensemble mean
+  upsample: 5
+  N_units: 100
+  N_wash: 30
+  washout: true                 # synchronized on the 30 network steps before the first analysis
+  L: 10
+  augment_data: true
+  biased_observations: false    # the network maps the innovation to the bias, its next input
+  correlation_based_training: false
+  t_train: 1.0
+  t_val: 0.1                    # code of the paper (Table 3 prints 0.01 s)
+  t_test: 0.04
+  N_folds: 4
+  N_grid: 4                     # a 4 x 4 grid and 4 Bayesian evaluations (Appendix B)
+  N_func_evals: 20
+  noise: 0.03                   # noise added to the training input, as the code of the paper
+  std_phi: 0.5
+  std_alpha:                    # training members: uniform within 50 % of the prior mean (sigma_L = 0.5)
+    beta: [35., 105.]
+    zeta: [30., 90.]
+    kappa: [2., 6.]
+  rho_range: [0.7, 1.05]
+  sigma_in_range: [-5., 0.]     # log10
+  tikh_range: [1.0e-16]
+  plot_training: false

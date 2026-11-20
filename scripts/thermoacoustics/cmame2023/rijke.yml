@@ -1,0 +1,63 @@
+# Time-delayed Rijke tube of Nóvoa, Racca & Magri (2023), section 6.3 and Table 4 (python -m romda.run, or
+# cmame2023/replicate.py for the figures and Table 2). Where the paper is silent, the settings follow the code of
+# the paper (commit f557a3d of this repository, main_Rijke.py); the README of this folder lists every choice.
+name: rijke_cmame2023
+
+truth:
+  model: Rijke
+  params:
+    dt: 1.0e-4
+    beta: 4.2                   # the truth; the forecast model starts from 4.0 and 1.5e-3 (the defaults of Rijke)
+    tau: 1.4e-3
+    Nc: 50                      # the delay line of a model that estimates tau, for the truth too
+    tau_adv: 1.0e-2
+  window: [1.5, 2.0, 2.6]       # t_start, t_stop, t_max [s]; the network is trained on the end of the record
+  t_min: 1.0                    # the clock of the experiment starts here: the ensemble is drawn at t = 1 s and
+                                # each member is forecast with its own parameters for 0.5 s before the first datum
+  Nt_obs: 20
+  manual_bias: linear           # linear: 0.3 p + 0.1 max(p); periodic: 0.2 max(p) cos(2 p / max(p))
+  add_noise: true
+  noise_type: 'gauss, mult'
+  noise_level: 0.01
+
+forecast:
+  kind: physical
+
+da:
+  method: rBA_EnKF
+  std_obs: 0.01                 # Cdd = 0.01 max|d|^2 I (a fraction of a variance, as the code of the paper)
+  bias_regularization: 0.
+  m: 50
+  std_phi: 0.2
+  distribution_alpha: normal    # normal, mean (4.0, 1.5e-3) and standard deviation 20 % of the mean:
+  std_alpha:                    # [mean - 2 sigma, mean + 2 sigma]
+    beta: [2.4, 5.6]
+    tau: [0.9e-3, 2.1e-3]
+  inflation: 1.002
+  inflation_factor_rejection: 1.002
+
+bias:                           # ESN bias estimator, Table 4
+  N_ens: 1
+  upsample: 2
+  N_units: 500
+  N_wash: 50
+  washout: true
+  L: 50
+  augment_data: true
+  biased_observations: false
+  correlation_based_training: false
+  t_train: 0.5
+  t_val: 0.02
+  t_test: 0.02
+  N_folds: 4
+  N_grid: 4
+  N_func_evals: 20
+  noise: 0.03                   # noise added to the training input, as the code of the paper
+  std_phi: 0.2
+  std_alpha:                    # training members: uniform within 20 % of the prior mean (sigma_L = 0.2)
+    beta: [3.2, 4.8]
+    tau: [1.2e-3, 1.8e-3]
+  rho_range: [0.7, 1.05]
+  sigma_in_range: [-5., -2.]    # log10
+  tikh_range: [1.0e-16]
+  plot_training: false

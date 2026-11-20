@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `scripts/thermoacoustics/cmame2023/` and the documentation page of the replication of Nóvoa, Racca & Magri
+  (2023) are public: the Van der Pol oscillator and the Rijke tube with the regularized bias-aware EnKF.
+
 ## 4.1.0 (2026-11-17)
 
 ### Added

@@ -597,7 +597,7 @@ def visualize_flow_data(X_true, X_noisy, simulation_dir=''):
 def animate_flowfields(datsets,
                        time=None,
                        n_frames=40, cmaps=None, step=1,
-                       figsize=None, aspect=None):
+                       figsize=None, aspect=None, sensors=None, timeseries=None):
     """Create a `matplotlib.animation.FuncAnimation` of side-by-side flow fields.
 
     Parameters
@@ -608,7 +608,8 @@ def animate_flowfields(datsets,
         share spatial dimensions). Keys are used as subplot titles; a title
         containing ``'RMS'`` or ``'std'`` is drawn in ``'Reds'`` or ``'Blues'``.
     time : np.ndarray, optional
-        Ignored; frames are counted in snapshots.
+        Times of the snapshots, shape ``(Nt,)``. Only the `timeseries` panels employ
+        them, to place the cursor of the current frame; frames are counted in snapshots.
     n_frames : int, optional
         Number of snapshots to animate. Default 40.
     cmaps : list of str, optional
@@ -621,6 +622,16 @@ def animate_flowfields(datsets,
         Physical height/width of one displayed grid cell (rows/columns after the
         automatic transpose), passed to `Axes.set_aspect` -- e.g. ``dx / dy`` on a
         uniform but anisotropic grid. Default None (the panel shape sets it).
+    sensors : array_like, optional
+        Sensor locations, shape ``(N_sensors, 2)``: the indices of each sensor along
+        the first two axes of the datasets as passed. They are marked on every panel.
+        Default None (no sensors).
+    timeseries : list of dict, optional
+        One panel under the fields per entry (`time` is then required). Each frame shows
+        the series up to its own time only, which a vertical cursor marks. Keys of an entry: ``'lines'``, a list
+        of ``(t, y, kwargs)`` passed to `Axes.plot`; ``'band'``, an optional
+        ``(t, lower, upper, kwargs)`` passed to `Axes.fill_between`; and ``'ylabel'``.
+        The first panel carries the legend. Default None (no panels).
 
     Returns
     -------
@@ -633,11 +644,40 @@ def animate_flowfields(datsets,
 
     if figsize is None:
         figsize = (4, 1.5 * len(datsets))
-    fig, axs = plt.subplots(1, len(datsets), sharex=True, sharey=True,
-                            figsize=figsize, layout='constrained', squeeze=False)
-    axs = axs[0]
+    timeseries = list(timeseries or [])
+    if timeseries and time is None:
+        raise ValueError("timeseries panels need the snapshot times: pass time=.")
+    fig = plt.figure(figsize=figsize, layout='constrained')
+    gs = fig.add_gridspec(1 + len(timeseries), len(datsets),
+                          height_ratios=[4] + [1] * len(timeseries))
+    axs = [fig.add_subplot(gs[0, 0])]
+    axs += [fig.add_subplot(gs[0, j], sharex=axs[0], sharey=axs[0]) for j in range(1, len(datsets))]
+
+    cursors, ts_lines, ts_bands = [], [], []
+    for k, panel in enumerate(timeseries):
+        ax = fig.add_subplot(gs[1 + k, :], **(dict(sharex=cursors[0].axes) if cursors else {}))
+        if panel.get('band') is not None:
+            t_b, lower, upper, kw = panel['band']
+            ts_bands.append([ax.fill_between(t_b, lower, upper, **kw), ax,
+                             np.asarray(t_b), np.asarray(lower), np.asarray(upper), kw])
+        for t_l, y_l, kw in panel['lines']:
+            ts_lines.append((ax.plot(t_l, y_l, **kw)[0], np.asarray(t_l), np.asarray(y_l)))
+        # the whole series sets the limits, which stay fixed while the frames reveal it
+        # the time axis covers the series, which may start before the first frame
+        t_all = np.concatenate([np.ravel(time)] + [np.ravel(line[0]) for line in panel['lines']])
+        ax.set(ylabel=panel.get('ylabel'), xlim=(np.min(t_all), np.max(t_all)), ylim=ax.get_ylim())
+        ax.tick_params(labelbottom=k == len(timeseries) - 1)
+        if k == 0:
+            ax.legend(loc='lower center', bbox_to_anchor=(.5, 1.), ncols=6, frameon=False, fontsize='small')
+        if k == len(timeseries) - 1:
+            ax.set_xlabel('$t$')
+        cursors.append(ax.axvline(time[0], color='k', lw=.8))
 
     # Transpose datasets if needed so vertical dim > horizontal dim
+    if sensors is not None:
+        sensors = np.atleast_2d(sensors)
+        if next(iter(datsets.values())).shape[0] < next(iter(datsets.values())).shape[1]:
+            sensors = sensors[:, ::-1]
     for key, D in datsets.items():
         if D.shape[0] < D.shape[1]:
             datsets[key] = D.transpose(1, 0, 2)
@@ -667,6 +707,9 @@ def animate_flowfields(datsets,
             ims.append(ax.pcolormesh(D[..., 0], rasterized=True,
                                      cmap=plt.get_cmap(cmap), norm=norm))
 
+        if sensors is not None:  # cell centres of pcolormesh: row -> vertical, column -> horizontal
+            ax.scatter(sensors[:, 1] + .5, sensors[:, 0] + .5, c=np.arange(len(sensors)),
+                       cmap='YlOrRd', edgecolors='k', s=30, lw=.8)
         ax.set(xticks=[], yticks=[])
         if aspect is not None:
             ax.set_aspect(aspect)
@@ -679,8 +722,17 @@ def animate_flowfields(datsets,
         frame = frame_indices[ti]
         for im, D in zip(ims, datsets.values()):
             im.set_array(D[..., frame])
+        for cursor in cursors:
+            cursor.set_xdata([time[frame], time[frame]])
+        for line, t_l, y_l in ts_lines:  # no data later than the current frame
+            line.set_data(t_l[t_l <= time[frame]], y_l[t_l <= time[frame]])
+        for band in ts_bands:
+            artist, ax, t_b, lower, upper, kw = band
+            artist.remove()
+            past = t_b <= time[frame]
+            band[0] = ax.fill_between(t_b[past], lower[past], upper[past], **kw)
         logger.debug('Frame %d/%d', ti + 1, len(frame_indices))
-        return ims
+        return ims + cursors
 
     plt.close(fig)
     return FuncAnimation(fig, animate, frames=len(frame_indices), cache_frame_data=False)
