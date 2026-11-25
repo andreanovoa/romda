@@ -1,7 +1,8 @@
 # Parametric ESN-DA: Lorenz-63 trained across rho = 24-38 (chaotic across the range),
 # deployed on a fresh truth at an unseen rho with rho estimated online. The truth and
 # forecast values mirror dev/ESN-DA/defaults.LORENZ63_PARAMETRIC exactly; the da and
-# window blocks are the recipe of the former tutorial 43 (dev/esn_da/tutorials/43_DA_parameter_estimation.ipynb).
+# window blocks are the recipe of the first version of tutorial 43; the tutorial
+# (tutorials/4_Real-time_DA_ROMs/43_DA_parameter_estimation.ipynb) now observes every 6 steps and varies Nt_obs.
 name: lorenz63_parametric
 truth:
   model: Lorenz63
@@ -36,6 +37,9 @@ forecast:
                               # 0.01 on top changes no valid time (rho = 28 and 33.5, 20 windows each, p = 0.83)
     seed: 0
     Win_type: sparse_dense_bias   # every unit sees the input bias, as in lorenz63.yml
+    # conventions of the networks of the paper, pinned: they are not the defaults of romda
+    scale_bias_in: true             # sigma_in multiplies the input bias
+    regularize_bias_out: true       # the Tikhonov factor acts on the output bias
     bias_in: 0.16
 da:
   seed: 0

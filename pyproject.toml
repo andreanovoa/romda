@@ -12,7 +12,6 @@ license = {text = "MIT"}
 authors = [
     {name = "Andrea Nóvoa"},
     {name = "Lukas Campbell"},
-    {name = "Ben Eze"},
 ]
 maintainers = [
     {name = "Andrea Nóvoa", email = "a.novoa@imperial.ac.uk"},

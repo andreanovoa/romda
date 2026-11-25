@@ -14,6 +14,12 @@ from .bias import Bias
 logger = logging.getLogger(__name__)
 
 
+
+#: Options of the bias training data (`create_bias_training_dataset`), which key the store but are not options of
+#: the network: they are dropped before the network is built.
+_TRAINING_DATA_OPTIONS = frozenset({'L', 'augment_data_length', 'biased_observations', 'keep_fixed_points',
+                                    'lag_criterion', 'std_alpha', 'training_record', 'y_model'})
+
 class ESN_bias(Bias):
     r"""Echo-state-network bias estimator.
 
@@ -207,4 +213,6 @@ class ESN_bias(Bias):
                     save_to_pickle_file(filename, train_data_dict)
             kwargs.update(train_data_dict)
 
-        return auto_load_or_create(query_hash=query_hash, force_create=self.force_retrain, **kwargs)
+        # the options of the training data are in the hash, not in the network: ESN_model would warn on each
+        network_kwargs = {k: v for k, v in kwargs.items() if k not in _TRAINING_DATA_OPTIONS}
+        return auto_load_or_create(query_hash=query_hash, force_create=self.force_retrain, **network_kwargs)

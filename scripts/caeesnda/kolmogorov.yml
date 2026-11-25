@@ -29,6 +29,9 @@ forecast:
     sigma_in: 0.8
     tikh: 1.0e-10
     Win_type: dense
+    # conventions of the networks of the paper, pinned: they are not the defaults of romda
+    scale_bias_in: true             # sigma_in multiplies the input bias
+    regularize_bias_out: true       # the Tikhonov factor acts on the output bias
     norm_method: std
     connect: 10
     noise: 1.0e-3

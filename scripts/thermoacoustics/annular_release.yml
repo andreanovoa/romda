@@ -40,6 +40,10 @@ da:
 bias:                           # ESN bias estimator (rBA_EnKF only)
   upsample: 5
   N_units: 50
+  # conventions of the networks of the reproduction, pinned: they are not the defaults of romda
+  Win_type: sparse
+  scale_bias_in: true             # sigma_in multiplies the input bias
+  regularize_bias_out: true       # the Tikhonov factor acts on the output bias
   N_wash: 10
   augment_data: true
   biased_observations: true

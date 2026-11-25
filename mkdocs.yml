@@ -99,6 +99,7 @@ nav:
       - Kalman filters: api/filter_deterministic.md
     - romda.bias_estimators: api/bias_estimators.md
     - romda.observations: api/observations.md
+    - romda.plotting: api/plotting.md
     - API overview: api/index.md
   - Tutorials:
       - Overview: tutorials.md

@@ -22,6 +22,10 @@ rom:
   # ------ ESN arguments (defaults of v1.1) ------ #
   t_test: 0.
   N_units: 40
+  # conventions of the networks of the reproduction, pinned: they are not the defaults of romda
+  Win_type: sparse_dense_bias
+  scale_bias_in: true             # sigma_in multiplies the input bias
+  regularize_bias_out: true       # the Tikhonov factor acts on the output bias
   train_ESN: true
   N_wash: 5
   noise: 1.0e-2

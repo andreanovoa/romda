@@ -31,7 +31,6 @@ All use `DiscreteIntegrator`. The ML base classes `EchoStateNetwork` (from the e
 | `LinearModel` | `F` (transition matrix), `Q_noise` | $\vect{\psi}_{t+1} = \matr{F}\vect{\psi}_t + \vect{\eta}_t$ |
 
 
-
 ---
 
 ## Estimator

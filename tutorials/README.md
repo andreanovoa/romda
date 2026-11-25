@@ -26,7 +26,7 @@ experiments from the command line: [`lorenz/`](../scripts/examples/lorenz/README
 * [x] 10 - Introduction to real-time DA from a Bayesian perspective: MAP estimation and the classical Kalman filter on a linear model.
 * [x] 11 - Introduction to ensemble DA: the EnKF, twin experiment on the Van der Pol model, Monte Carlo convergence to the KF.
 * [x] 13 - Augmented formulation: combined state and parameter estimation
-* [x] 15 - Chaos and DA: twin experiment on the Lorenz63
+* [x] 15 - Chaos and DA: twin experiment on the Lorenz63; sampling frequency against the Lyapunov time, inflation in chaotic systems, and the Kuramoto–Sivashinsky equation
 * [x] 16 - Model bias and DA: bias-aware DA with a twin experiment on the Van der Pol model
 * [x] 17 - Bimodal posterior: Lorenz63 observed through z alone, and the Gaussian-mixture ensemble filter
 

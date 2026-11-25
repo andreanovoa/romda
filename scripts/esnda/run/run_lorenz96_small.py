@@ -43,7 +43,7 @@ DEFAULT_PARAMS = {'est_wout': False, 'start_param': 0, 'twin': False, 'ddof': 0,
 DEFAULT_ESN = DEFAULTS['forecast']['esn']
 WINDOW_LYAP = DEFAULTS['window_lyap']
 
-#: Relative spread of the initial readout singular values (the former tutorial 40, dev/esn_da/tutorials).
+#: Relative spread of the initial readout singular values (tutorial 40).
 STD_WOUT = 0.04
 
 

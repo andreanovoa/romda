@@ -7,6 +7,27 @@
 - `scripts/thermoacoustics/cmame2023/` and the documentation page of the replication of Nóvoa, Racca & Magri
   (2023) are public: the Van der Pol oscillator and the Rijke tube with the regularized bias-aware EnKF.
 
+### Changed
+
+- `ESN_model` and the store of trained networks work with the echostatenetwork whose readout is
+  $\mathbf{W}_\mathrm{out}^T \mathbf{r} + \mathbf{w}_0$ (the intercept outside `Wout`) and with the releases up
+  to 0.6.0, whose `Wout` holds the constant in its last row. The store keeps one layout, `[Wout; constant row]`,
+  so the networks stored before load to the same network with either. The singular values and the directions of
+  the read-out corrections (`est_alpha=['Wout']`, `['Wdir']`) are those of the readout with its constant, as before.
+- The defaults of `ESN_model` and `ESNConfig` are the conventions that the hyperparameter study favours:
+  `Win_type='sparse_dense_bias'` (every unit reads the input bias; `'sparse'` before), `scale_bias_in=False`
+  (`sigma_in` does not multiply the input bias; new option) and `regularize_bias_out=False` (the Tikhonov factor
+  does not act on the constant of the readout; `True` before). They are options of romda, so they do not follow
+  the defaults of the installed echostatenetwork. A configuration that leaves them at their defaults trains a new
+  network: its hash in the store differs from that of the networks of the former conventions, which a
+  configuration finds by pinning `Win_type`, `scale_bias_in: true` and `regularize_bias_out: true`, as the
+  configurations of the published studies now do (`scripts/esnda`, `scripts/thermoacoustics`,
+  `scripts/podesn_cylinder/iccs2025.yml`, `scripts/caeesnda`). A network stored or pickled before the change loads
+  with the conventions that it was trained with.
+- echostatenetwork 0.6.0 has no `scale_bias_in`: there a network is trained, hashed and stored with
+  `scale_bias_in=True`, with a warning. The echostatenetwork with the intercept runs a stored network of
+  `regularize_bias_out=True` but does not train one.
+
 ## 4.1.0 (2026-11-17)
 
 ### Added

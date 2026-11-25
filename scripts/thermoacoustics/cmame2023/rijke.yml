@@ -40,6 +40,10 @@ bias:                           # ESN bias estimator, Table 4
   N_ens: 1
   upsample: 2
   N_units: 500
+  # conventions of the networks of the reproduction, pinned: they are not the defaults of romda
+  Win_type: sparse_dense_bias
+  scale_bias_in: true             # sigma_in multiplies the input bias
+  regularize_bias_out: true       # the Tikhonov factor acts on the output bias
   N_wash: 50
   washout: true
   L: 50

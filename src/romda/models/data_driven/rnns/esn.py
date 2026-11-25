@@ -25,6 +25,31 @@ def log_nMSE(case, Y_true, Y_pred, norm=None):
 VALIDATION_METRICS = {'log_nMSE': log_nMSE}
 
 
+def has_intercept(esn=EchoStateNetwork):
+    """True when the readout of `esn` (a network or its class) is ``Wout^T r + intercept`` (echostatenetwork with
+    the attribute `intercept`), False when it is ``Wout^T [r; bias_out]``, the constant in the last row of `Wout`
+    (the releases up to 0.6). The one place of romda that tells the two layouts apart."""
+    return hasattr(esn if isinstance(esn, type) else type(esn), 'intercept')
+
+
+#: The conventions of the networks trained before romda set its own (`ESN_model.Win_type`, `scale_bias_in`,
+#: `regularize_bias_out`): the published studies pin these values, and a network stored or pickled without the last two
+#: was trained with them.
+LEGACY_CONVENTIONS = dict(Win_type='sparse', scale_bias_in=True, regularize_bias_out=True)
+
+
+def trained_scale_bias_in(scale_bias_in):
+    """The `scale_bias_in` of the network that the installed echostatenetwork trains when asked for `scale_bias_in`.
+    The releases up to 0.6.0 have no such option and multiply the input bias by `sigma_in`: False becomes True, with
+    a warning. The store hashes this value, so a network is kept under the convention that it was trained with."""
+    if not scale_bias_in and not hasattr(EchoStateNetwork, 'scale_bias_in'):
+        warnings.warn('scale_bias_in=False (the input bias outside sigma_in, the default of romda) needs '
+                      'echostatenetwork > 0.6.0: the network is trained, and stored, with scale_bias_in=True',
+                      stacklevel=3)
+        return True
+    return bool(scale_bias_in)
+
+
 def phi_to_esn_layout(Z):
     """``(N_latent, N_t)`` latent coefficients (a projector's ``encode()`` output,
     or POD's ``Phi``) -> the ``(L, N_t, N_latent)`` layout `ESN_model` expects as
@@ -98,6 +123,18 @@ class ESN_model(EchoStateNetwork, Model):
     # True (echostatenetwork): its mean over the training data is subtracted first.
     centre_input = True
     validation_metric_name = None   # the name of `validation_metric`, which the store of trained networks hashes
+    # The conventions of the network, set here so that they do not follow the defaults of the installed
+    # echostatenetwork; the store of trained networks hashes them. The published studies pin `LEGACY_CONVENTIONS`.
+    # - Win_type 'sparse_dense_bias': every unit reads the input bias ('sparse': one random column per unit, state or
+    #   bias).
+    # - scale_bias_in False: sigma_in does not multiply the input bias (True: it does, like the state; the only
+    #   convention of echostatenetwork <= 0.6.0, see `trained_scale_bias_in`).
+    # - regularize_bias_out False: the Tikhonov factor does not act on the constant of the readout. True is an option
+    #   of the echostatenetwork whose Wout holds the constant (<= 0.6); the later ones cannot train such a network,
+    #   but run a stored one.
+    Win_type = 'sparse_dense_bias'
+    scale_bias_in = False
+    regularize_bias_out = False
 
     Wout_svd = False
     # True: the augmented state carries log(svd_i), so members stay positive; with 'Wout' in est_alpha, a float
@@ -105,7 +142,8 @@ class ESN_model(EchoStateNetwork, Model):
     Wout_log = False
     # Readout corrections along fixed directions (est_alpha=['Wdir']): each member reads out with
     # Wout + Wout_dirs @ C_j, C_j = (k, N_dim) coordinates 'wdir_<i>_<q>' in the augmented state, started from
-    # N(0, (std_alpha * Wout_dir_std)^2); Wout_dirs is (N_units + 1, k), Wout_dir_std is (k, N_dim).
+    # N(0, (std_alpha * Wout_dir_std)^2); Wout_dirs is (N_units + 1, k), Wout_dir_std is (k, N_dim). The directions
+    # and the singular values of `Wout_svd` are those of the readout with its constant, `_readout_matrix`.
     Wout_dirs = None
     Wout_dir_std = None
     validation_data = None
@@ -181,11 +219,26 @@ class ESN_model(EchoStateNetwork, Model):
         elif y0 is None:
             raise ValueError('Either training data or initial state y0 must be provided to initialize the ESN_model.')
 
+        # the instance holds its conventions: a pickle without them is a network of `LEGACY_CONVENTIONS`
+        for key in LEGACY_CONVENTIONS:
+            setattr(self, key, getattr(self, key))
+
         initial_dict = {key: kwargs.pop(key) for key in list(kwargs.keys()) if key in vars(EchoStateNetwork)}
         EchoStateNetwork.__init__(self,
                                 y=y0,
                                 dt=dt,
                                 **initial_dict)
+
+        # the conventions that the installed echostatenetwork cannot give
+        if not self.trained:
+            self.scale_bias_in = trained_scale_bias_in(self.scale_bias_in)
+            if self.regularize_bias_out and has_intercept(self):
+                raise ValueError('regularize_bias_out=True (the Tikhonov factor on the constant of the readout) is '
+                                 'an option of echostatenetwork <= 0.6: the installed one cannot train this '
+                                 'network, only run one that the store holds')
+        elif not self.scale_bias_in and not hasattr(EchoStateNetwork, 'scale_bias_in'):
+            raise ValueError('this network was trained with scale_bias_in=False (the input bias outside sigma_in), '
+                             'which needs echostatenetwork > 0.6.0')
 
         # what is left goes to `train` (its own options) and `Model.__init__` (the rest); name the
         # keys that neither knows, so a misspelt or unsupported option is not lost silently
@@ -221,7 +274,7 @@ class ESN_model(EchoStateNetwork, Model):
 
         # Initialise SVD Wout terms if required
         if self.Wout_svd:
-            [self.Wout_U, self.Wout_Sigma0, self.Wout_Vh] = sla.svd(self.Wout, full_matrices=False)
+            [self.Wout_U, self.Wout_Sigma0, self.Wout_Vh] = sla.svd(self._readout_matrix(), full_matrices=False)
 
         # =================== STEP 4: Model INITIALIZATION ======================
         Model.__init__(self,
@@ -241,6 +294,21 @@ class ESN_model(EchoStateNetwork, Model):
             # estimated parameter by name raises KeyError until real labels are set.
             self.alpha_labels = dict(zip(self.param_names,
                                          param_labels or [f'${n}$' for n in self.param_names]))
+
+    def __setstate__(self, state):
+        """Restore a pickled network (also `copy`). A network pickled before romda set the conventions of the
+        network has none in its state: it was trained with `LEGACY_CONVENTIONS`, which the defaults must not
+        replace. With the echostatenetwork that has the intercept, its `Wout` still holds the constant of the
+        readout in its last row, which becomes the intercept."""
+        legacy = 'scale_bias_in' not in state
+        if legacy:
+            state = {**{key: LEGACY_CONVENTIONS[key] for key in ('scale_bias_in', 'regularize_bias_out')}, **state}
+        super().__setstate__(state)
+        if legacy and has_intercept(self) and getattr(self, '_Wout', None) is not None \
+                and self._Wout.shape[0] == self._n_readout + 1:
+            W = np.array(self._Wout, dtype=float)
+            W[-1] *= float(np.ravel(self.__dict__.pop('bias_out', 1.0))[0])
+            self.Wout = W                                   # the setter splits [Wout; intercept]
 
     @property
     def t_transient(self):
@@ -346,7 +414,7 @@ class ESN_model(EchoStateNetwork, Model):
             if svd_keys:
                 if not self.Wout_svd:
                     self.Wout_svd = True
-                    [self.Wout_U, self.Wout_Sigma0, self.Wout_Vh] = sla.svd(self.Wout, full_matrices=False)
+                    [self.Wout_U, self.Wout_Sigma0, self.Wout_Vh] = sla.svd(self._readout_matrix(), full_matrices=False)
                 # the setters merge, so labels/lims of other estimated parameters survive
                 self.alpha_labels = {key: f'$\\sigma_{{{key.split("_")[1]}}}$' for key in svd_keys}
                 self.alpha_lims = {key: (None, None) for key in svd_keys}
@@ -462,7 +530,7 @@ class ESN_model(EchoStateNetwork, Model):
             if 'Wout' in est_alpha:
                 svd_names = [f'svd_{qi}' for qi in range(self.N_dim)]
                 est_alpha = [a for a in est_alpha if a != 'Wout'] + svd_names
-                nominal = dict(zip(svd_names, sla.svd(self.Wout, full_matrices=False)[1]))
+                nominal = dict(zip(svd_names, sla.svd(self._readout_matrix(), full_matrices=False)[1]))
 
             dir_names = []
             if 'Wdir' in est_alpha:
@@ -755,8 +823,8 @@ class ESN_model(EchoStateNetwork, Model):
         `EchoStateNetwork.reservoir_to_physical` to also support the SVD
         parametrization of `Wout`, see `Wout_svd`).
 
-        When `Wout_svd` is False: $\vect{u} = \matr{W}_\mathrm{out}^\mathrm{T}[\vect{r}; b_\mathrm{out}]$,
-        as in the base class. When True, $\matr{W}_\mathrm{out}$ is reconstructed
+        When `Wout_svd` is False, the readout of the base class. When True, the readout with its constant,
+        $[\matr{W}_\mathrm{out}; \vect{w}_0]$ (`_readout_matrix`), which multiplies $[\vect{r}; 1]$, is reconstructed
         (per ensemble member, if `r` has `m` members) from
         $\matr{U}\,\matr{\Sigma}\,\matr{V}^\mathrm{h}$ (`Wout_U`, `Wout_Sigma`,
         `Wout_Vh`) before the same read-out is applied; if `r` does not have exactly
@@ -783,8 +851,7 @@ class ESN_model(EchoStateNetwork, Model):
             return super().reservoir_to_physical(r, u=u)   # also the parallel layout
         else:
             self._check_readout_corrections('Wout_svd')
-            bias_out = self.bias_out * np.ones((1, r.shape[-1]))
-            r_aug = np.concatenate((r, bias_out), axis=0)
+            r_aug = self._augmented(r)
 
             if r.shape[-1] == self.m:
                 Wout = np.einsum('ij,kjl,lm->imk', self.Wout_U, self.Wout_Sigma, self.Wout_Vh)
@@ -796,6 +863,18 @@ class ESN_model(EchoStateNetwork, Model):
                 Wout = np.dot(self.Wout_U, np.dot(Wout_Sigma_avg, self.Wout_Vh))
                 return np.dot(r_aug.T, Wout).T
 
+
+    def _readout_matrix(self):
+        """The readout with its constant as one matrix, ``(N_units + 1, N_dim)``: ``[Wout; intercept]``, which
+        multiplies `_augmented` ``[r; 1]``; with the releases of echostatenetwork that keep the constant in the last
+        row of `Wout`, `Wout` itself, which multiplies ``[r; bias_out]``. The matrix that the store saves."""
+        return np.vstack([self.Wout, self.intercept]) if has_intercept(self) else self.Wout
+
+    def _augmented(self, r):
+        """``[r; 1]`` (``[r; bias_out]`` with the releases of echostatenetwork that have `bias_out`): the reservoir
+        states `r` ``(N_r, N_ens)`` with the row that the constant of `_readout_matrix` multiplies."""
+        constant = 1.0 if has_intercept(self) else self.bias_out
+        return np.concatenate((r, constant * np.ones((1, r.shape[-1]))), axis=0)
 
     def _parameter_inputs(self, r):
         """The raw input whose parameter rows a ``readout_input='params'`` readout reads, one column per column of
@@ -843,7 +922,7 @@ class ESN_model(EchoStateNetwork, Model):
             A = self.get_alpha_matrix
             C = np.stack([[A[self.est_alpha.index(f'wdir_{i}_{q}')] for q in range(self.N_dim)]
                           for i in range(k)])                                   # (k, N_dim, m)
-            proj = self.Wout_dirs.T @ np.vstack([r, self.bias_out * np.ones((1, r.shape[-1]))])  # (k, m)
+            proj = self.Wout_dirs.T @ self._augmented(r)                         # (k, m)
             u = u + np.einsum('kqm,km->qm', C, proj)
         return u
 

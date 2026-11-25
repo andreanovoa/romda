@@ -1,7 +1,9 @@
-"""Helpers of tutorial 17, the Gaussian-mixture ensemble filter: a Lorenz-63 integrator vectorized over many states,
-the scores of the experiments, and the figures.
+"""Helpers of the tutorials of topic 1. Tutorial 15 (chaos and data assimilation): the twin experiments on the Lorenz-63
+system and the Kuramoto-Sivashinsky equation, their scores and their figures. Tutorial 17 (the Gaussian-mixture
+ensemble filter): a Lorenz-63 integrator vectorized over many states, the scores of the experiments, and the figures. Tutorial 16
+(bias-aware data assimilation): its figures.
 
-Colours: the true state is black; the mirror image, the Gaussian filter and the mixture filter take the validated
+Colours of tutorial 17: the true state is black; the mirror image, the Gaussian filter and the mixture filter take the validated
 categorical slots orange, blue and aqua of the romda figures; the forecast members are dark grey; the attractor is
 light grey; the reference posterior is one purple hue, darker for larger weights. In the two-dimensional example, the
 exact prior is grey, the exact posterior is black, the priors of the filters take a lighter shade of their colour
@@ -447,3 +449,333 @@ def plot_twin(scores, t_data, t_lyap):
             [Line2D([], [], color=C_FILTER[k], lw=1.4) for k in (1, 2)],
             [r'$x^\dagger$', r'$-x^\dagger$ (mirror image)', NAME[1], NAME[2]])
     plt.show()
+
+
+# ── Tutorial 15: chaos, sampling frequency and inflation ─────────────────────
+
+from romda.estimators import EnSRKF  # noqa: E402
+from romda.metrics import error_scale  # noqa: E402
+from romda.models.physical import KS, Lorenz63  # noqa: E402
+from romda.observations import Observations, observation_covariance  # noqa: E402
+from romda.plotting import (COLORS, TUTORIAL_STYLE, plot_grouped_dots, plot_scores, space_time,  # noqa: E402
+                            use_tutorial_style)
+from romda.utils import interpolate  # noqa: E402
+
+OI_BLUE, OI_GREY = COLORS['blue'], COLORS['grey']
+T_LYAP_L63, DT_L63 = 1 / 0.9056, 0.015
+T_LYAP_KS, KS_OPTIONS = 12.5, dict(Nx=64, L=20 * np.pi, dt=0.25, Nq=32)
+
+
+def _assimilate(filt, obs, inflation, noise):
+    """Run `filt` through the observations `obs`, with the covariance of their noise, and close its worker pool."""
+    filt.inflation_factor = inflation
+    Cdd = observation_covariance(obs, std_obs=noise)
+    for d, t_d in zip(obs.y_obs, obs.t_obs):
+        filt.forecast_step(t_end=t_d)
+        filt.analysis_step(d=d, Cdd=Cdd)
+    filt.model.close()
+    return filt
+
+
+def twin_lorenz63(dt_obs, m=50, inflation=1.0, estimate_parameters=False, seed=0, n_lyap=25, noise=0.05):
+    """Twin experiment on the Lorenz-63 system: x and z observed every `dt_obs` Lyapunov times for `n_lyap` Lyapunov
+    times, by an EnSRKF of `m` members that estimates the state, or the state and the three parameters."""
+    true = Lorenz63(dt=DT_L63, psi0=np.random.default_rng(seed).random(3) + 10, observe_dims=[0, 2])
+    psi, t = true.time_integrate(int((n_lyap + 12) * T_LYAP_L63 / DT_L63))
+    true.update_history(psi, t)
+    obs = Observations(model=true, t_start=10 * T_LYAP_L63, t_stop=(10 + n_lyap) * T_LYAP_L63, add_noise=True,
+                       Nt_obs=int(round(dt_obs * T_LYAP_L63 / DT_L63)), noise_type='gauss, add', noise_level=noise)
+    prior = dict(std_alpha=dict(rho=(25., 35.), beta=(2, 4), sigma=(5, 15))) if estimate_parameters else {}
+    filt = EnSRKF(parent_model=Lorenz63, dt=DT_L63, m=m, std_phi=0.2, observe_dims=[0, 2], seed=seed, **prior)
+    filt.forecast_step(t_end=8 * T_LYAP_L63, close=True)
+    _assimilate(filt, obs, inflation, noise)
+    t_f = np.asarray(filt.model.hist_t)
+    state = interpolate(np.asarray(true.hist_t), np.asarray(true.hist)[:, :, 0], t_f)
+    return dict(t=t_f / T_LYAP_L63, true=state, members=np.asarray(filt.model.hist)[:, :3], obs=obs,
+                t_obs=obs.t_obs / T_LYAP_L63, filter=filt)
+
+
+def twin_ks(dt_obs, m=50, inflation=1.0, seed=0, n_lyap=15, noise=0.05):
+    """Twin experiment on the Kuramoto-Sivashinsky equation (L = 20 pi, 64 points, 32 sensors), observed every
+    `dt_obs` Lyapunov times for `n_lyap` Lyapunov times, by an EnSRKF of `m` members on the Fourier coefficients."""
+    true = KS(seed=seed, **KS_OPTIONS)
+    psi, t = true.time_integrate(int((n_lyap + 12) * T_LYAP_KS / true.dt))
+    true.update_history(psi, t)
+    obs = Observations(model=true, t_start=10 * T_LYAP_KS, t_stop=(10 + n_lyap) * T_LYAP_KS, add_noise=True,
+                       Nt_obs=int(round(dt_obs * T_LYAP_KS / true.dt)), noise_type='gauss, add', noise_level=noise)
+    filt = EnSRKF(parent_model=KS, m=m, std_phi=0.05, seed=seed + 1, **KS_OPTIONS)
+    filt.forecast_step(t_end=8 * T_LYAP_KS, close=True)
+    _assimilate(filt, obs, inflation, noise)
+    t_f = np.asarray(filt.model.hist_t)
+    i_true = np.searchsorted(np.asarray(true.hist_t), t_f - 1e-9)
+    return dict(t=t_f / T_LYAP_KS, true=np.fft.irfft(np.asarray(true.hist)[i_true, :, 0], axis=1),
+                members=np.fft.irfft(np.asarray(filt.model.hist), axis=1), obs=obs, t_obs=obs.t_obs / T_LYAP_KS,
+                filter=filt)
+
+
+def _spread(members, scale):
+    """Spread of an ensemble (N_t, N, m) at each time, normalized by `scale`."""
+    return np.sqrt(members.var(axis=-1, ddof=1).sum(axis=1)) / scale
+
+
+def scores(run, n_sync=5):
+    """Error of the ensemble mean and spread of the ensemble, from `n_sync` Lyapunov times after the first observation
+    to the last, normalized by the root-mean-square distance of the true state from its time average."""
+    w = (run['t'] >= run['t_obs'][0] + n_sync) & (run['t'] <= run['t_obs'][-1])
+    scale = error_scale(run['true'][w])
+    error = np.sqrt(np.mean(np.sum((run['members'][w].mean(axis=-1) - run['true'][w]) ** 2, axis=1))) / scale
+    return error, np.sqrt(np.mean(_spread(run['members'][w], scale) ** 2))
+
+
+def sweep(experiment, values, seeds=range(3), key='dt_obs', score=0, **options):
+    """Scores of `experiment` (twin_lorenz63 or twin_ks) for each of `values` of `key` and each seed:
+    (len(values), len(seeds), 2) for the error and the spread, or one of the two with `score`."""
+    out = np.array([[scores(experiment(**{key: v, 'seed': s, **options})) for s in seeds] for v in values])
+    return out if score is None else out[..., score]
+
+
+def plot_spread_growth(cases, scale, t_end=14):
+    """Spread of a free ensemble that starts in a small ball, for each (rho, psi0, colour, label) of `cases`."""
+    fig, ax = plt.subplots(figsize=(5, 2.6))
+    for rho, psi0, color, label in cases:
+        free = EnSRKF(parent_model=Lorenz63, dt=DT_L63, rho=rho, m=50, psi0=psi0, std_phi=1e-4)
+        free.forecast_step(t_end=t_end * T_LYAP_L63, close=True)
+        ax.semilogy(np.asarray(free.model.hist_t) / T_LYAP_L63, _spread(np.asarray(free.model.hist), scale),
+                    color=color, label=label)
+    t = np.linspace(0, 9, 10)
+    ax.semilogy(t, 1e-4 * np.exp(t), 'k--', lw=0.8, label=r'$\propto \mathrm{e}^{t/T_\lambda}$')
+    ax.set(xlabel=r'$t/T_\lambda$', ylabel='spread', xlim=[0, t_end], ylim=[1e-7, 5])
+    ax.legend()
+    plt.show()
+
+
+def plot_tracking(runs, window=(18, 30)):
+    """x and y of the true state (black), the members (blue) and the data of x (dots), one row per run of `runs`,
+    {label: twin_lorenz63}."""
+    fig, axs = plt.subplots(len(runs), 2, figsize=(6.5, 1.5 * len(runs) + 0.4), sharex=True, sharey=True)
+    for row, (label, run) in zip(axs, runs.items()):
+        w = (run['t'] >= window[0]) & (run['t'] <= window[1])
+        w_obs = (run['t_obs'] >= window[0]) & (run['t_obs'] <= window[1])
+        for ax, k in zip(row, (0, 1)):
+            ax.plot(run['t'][w], run['members'][w, k], color=COLORS['blue'], lw=0.3, alpha=0.3)
+            ax.plot(run['t'][w], run['true'][w, k], color='k', lw=1)
+        row[0].plot(run['t_obs'][w_obs], run['obs'].y_obs[w_obs, 0], '.', color=COLORS['vermillion'], ms=4)
+        row[0].set(ylabel=label)
+    axs[0, 0].set_title('$x$ (observed)', fontsize=10)
+    axs[0, 1].set_title('$y$ (not observed)', fontsize=10)
+    for ax in axs[-1]:
+        ax.set(xlabel=r'$t/T_\lambda$', xlim=window)
+    plt.show()
+
+
+def _sampling(ax, values, results):
+    for k, (color, label) in enumerate([(COLORS['blue'], 'error'), (COLORS['grey'], 'spread')]):
+        plot_scores(ax, values, results[:, :, k], color=color, label=label, band='points', marker=None)
+    ax.axhline(1, color='k', ls=':', lw=0.8)
+    ax.set(xscale='log', yscale='log', xlabel=r'$\Delta t_\mathrm{obs}/T_\lambda$', ylabel='normalized error')
+    ax.legend()
+
+
+def plot_sampling(values, results):
+    """Error and spread (dots: seeds; lines: medians) against the time between observations."""
+    _sampling(plt.subplots(figsize=(4.5, 2.6))[1], values, results)
+    plt.show()
+
+
+def plot_spread_between_analyses(run, window=(20, 26)):
+    """Spread of the ensemble of a twin experiment, with the analyses (vertical lines)."""
+    w = (run['t'] >= window[0]) & (run['t'] <= window[1])
+    fig, ax = plt.subplots(figsize=(6.5, 2.))
+    ax.semilogy(run['t'][w], _spread(run['members'][w], error_scale(run['true'])), color=COLORS['blue'])
+    for t in run['t_obs'][(run['t_obs'] >= window[0]) & (run['t_obs'] <= window[1])]:
+        ax.axvline(t, color=COLORS['vermillion'], lw=0.5, alpha=0.6)
+    ax.set(xlabel=r'$t/T_\lambda$', ylabel='spread', xlim=window)
+    plt.show()
+
+
+def _dots(ax, factors, groups):
+    plot_grouped_dots(ax, factors, groups, colors=[COLORS['vermillion'], COLORS['blue']])
+    ax.set(xlabel=r'$\rho_I$', yscale='log')
+
+
+def plot_inflation(factors, cases):
+    """Error against the inflation factor, one panel per case, {title: {label: (len(factors), seeds)}}."""
+    fig, axs = plt.subplots(1, len(cases), figsize=(6.5, 2.5), sharey=True)
+    for ax, (title, groups) in zip(np.atleast_1d(axs), cases.items()):
+        _dots(ax, factors, groups)
+        ax.set_title(title, fontsize=10)
+    np.atleast_1d(axs)[0].set_ylabel('error')
+    np.atleast_1d(axs)[0].legend(fontsize=8)
+    plt.show()
+
+
+def plot_ks_fields(runs, window=(9, 20)):
+    """True field, ensemble mean and absolute error of the KS equation, one column per run, {label: twin_ks}."""
+    x = np.linspace(0, KS_OPTIONS['L'], KS_OPTIONS['Nx'], endpoint=False)
+    fig, axs = plt.subplots(3, len(runs), figsize=(6.5, 4.2), sharex=True, sharey=True)
+    for col, (label, run) in zip(axs.T, runs.items()):
+        w = (run['t'] >= window[0]) & (run['t'] <= window[1])
+        mean = run['members'][w].mean(axis=-1)
+        space_time(col[0], run['t'][w], x, run['true'][w], vmax=3)
+        space_time(col[1], run['t'][w], x, mean, vmax=3)
+        space_time(col[2], run['t'][w], x, np.abs(mean - run['true'][w]), vmax=3, vmin=0, cmap='Reds')
+        for ax in col:
+            ax.axvline(run['t_obs'][0], color='k', lw=0.8, ls=':')
+        col[0].set_title(label, fontsize=10)
+        col[-1].set_xlabel(r'$t/T_\lambda$')
+    for ax, label in zip(axs[:, 0], ['true', 'ensemble mean', 'absolute error']):
+        ax.set_ylabel(f'{label}\n$x$')
+    plt.show()
+
+
+def plot_ks_sweeps(values, sampling, factors, inflation):
+    """Error and spread against the time between observations (left), and error against the inflation factor
+    (right), {label: (len(factors), seeds)}."""
+    fig, axs = plt.subplots(1, 2, figsize=(6.5, 2.6))
+    _sampling(axs[0], values, sampling)
+    _dots(axs[1], factors, inflation)
+    axs[1].set_ylabel('error')
+    axs[1].legend(fontsize=8)
+    plt.show()
+
+
+# ── Tutorial 16: bias-aware data assimilation ────────────────────────────────
+# Colours (Okabe-Ito): the truth is black, the model estimate is vermillion, the bias-corrected estimate is blue and
+# the bias estimate is green. The figures of this section set the tutorial style (`TUTORIAL_STYLE`) and leave the
+# global one;
+# each one ends with `plt.show()`, because leaving `rc_context` switches the interactive mode of a notebook off.
+
+from romda.utils import interpolate  # noqa: E402
+
+OI_16 = dict(model=COLORS['vermillion'], corrected=COLORS['blue'], bias=COLORS['green'], data=COLORS['grey'])
+WIDTH_16 = 6.5                               # full-page width, in inches
+
+
+def _legend_16(fig, axs):
+    """One legend above the panels, with the labelled lines of `axs`."""
+    handles = {}
+    for ax in np.ravel(axs):
+        handles.update(dict(zip(*ax.get_legend_handles_labels()[::-1])))
+    fig.legend(handles.values(), handles.keys(), loc='outside upper center', ncols=len(handles))
+
+
+def estimates(filt, truth):
+    """The signals of a run on the time steps of the model: the time `t`, the truth `d` and its bias `b_true`,
+    the model observables of the members `q` (Nt, Nq, m), and the ensemble means of the bias estimate `b` and of
+    the bias-corrected estimate `y` (equal to the mean of `q` without a bias estimator)."""
+    t, q = filt.model.hist_t, filt.model.get_observable_hist()
+    y = np.mean(filt.get_observable_hist()[0], axis=-1) if filt.is_bias_aware else np.mean(q, axis=-1)
+    return dict(t=t, q=q, y=y, b=y - np.mean(q, axis=-1), d=interpolate(truth.t_true, truth.y_true[..., 0], t),
+                b_true=interpolate(truth.t_true, truth.b_true[..., 0], t))
+
+
+def plot_truth_16(truth, t_cr, n_cr=1):
+    """The truth, the model observable without the bias, the observations and the bias over `n_cr` times `t_cr`."""
+    t0 = truth.t_obs[0]
+    w = (truth.t_true >= t0) & (truth.t_true <= t0 + n_cr * t_cr)
+    obs = truth.t_obs <= t0 + n_cr * t_cr
+    with plt.rc_context(TUTORIAL_STYLE):
+        fig, axs = plt.subplots(1, 2, figsize=(WIDTH_16, 2.3), sharex=True)
+        t = truth.t_true[w]
+        axs[0].plot(t, truth.y_true[w, 0, 0], 'k', lw=1.4, label='truth')
+        axs[0].plot(t, (truth.y_true - truth.b_true)[w, 0, 0], color=OI_16['model'], lw=1, label='truth without the bias')
+        axs[0].plot(truth.t_obs[obs], truth.y_obs[obs, 0], 'o', ms=3, mfc='w', mec=OI_16['data'], label='observations')
+        axs[1].plot(t, truth.b_true[w, 0, 0], color=OI_16['bias'], label='bias')
+        axs[0].set(xlabel='$t$ (s)', ylabel=r'$\eta$', xlim=(t[0], t[-1]))
+        axs[1].set(xlabel='$t$ (s)', ylabel='$b$')
+        _legend_16(fig, axs)
+        plt.show()
+
+
+def plot_training_16(truth, data, t_cr, n_cr=1):
+    """The training set of the network over `n_cr` times `t_cr`: the observables of the `L` training members and
+    their biases, against the truth and the true bias. `data` is the stored training set (``y_model`` and ``data``)."""
+    q, b = data['y_model'][..., 0, :], data['data'][..., 0].T                 # (Nt, L)
+    n = min(len(q), len(b), int(round(n_cr * t_cr / truth.dt)))
+    t = truth.t_true[-len(q):][:n]
+    d, b_true = truth.y_true[-len(q):, 0, 0][:n], truth.b_true[-len(q):, 0, 0][:n]
+    with plt.rc_context(TUTORIAL_STYLE):
+        fig, axs = plt.subplots(1, 2, figsize=(WIDTH_16, 2.3), sharex=True)
+        axs[0].plot(t, q[:n], color=OI_16['model'], lw=0.6, alpha=0.6, label='training members')
+        axs[0].plot(t, d, 'k', lw=1.4, label='truth')
+        axs[1].plot(t, b[:n], color=OI_16['bias'], lw=0.6, alpha=0.6, label='training biases')
+        axs[1].plot(t, b_true, 'k', lw=1.4, label='truth')
+        axs[0].set(xlabel='$t$ (s)', ylabel=r'$\eta$', xlim=(t[0], t[-1]))
+        axs[1].set(xlabel='$t$ (s)', ylabel='$b$')
+        _legend_16(fig, axs)
+        plt.show()
+
+
+def plot_estimates_16(runs, truth, t_cr, n_cr=1):
+    """One row for each run of `runs` (``{name: filter}``), over `n_cr` times `t_cr` before and after the last
+    observation: the truth, the model estimate with its ensemble and the bias-corrected estimate (left); the true
+    bias and its estimate (right). The assimilation ends at the dotted line."""
+    t_end = truth.t_obs[-1]
+    with plt.rc_context(TUTORIAL_STYLE):
+        fig, axs = plt.subplots(len(runs), 2, figsize=(WIDTH_16, 1.5 * len(runs) + 0.5), sharex=True, sharey='col',
+                                squeeze=False)
+        for row, (name, filt) in zip(axs, runs.items()):
+            s = estimates(filt, truth)
+            w = (s['t'] >= t_end - n_cr * t_cr) & (s['t'] <= t_end + n_cr * t_cr)
+            t, q = s['t'][w], s['q'][w, 0]
+            row[0].plot(t, s['d'][w, 0], 'k', lw=1.6, label='truth')
+            row[0].fill_between(t, q.min(axis=-1), q.max(axis=-1), color=OI_16['model'], alpha=0.25, lw=0)
+            row[0].plot(t, q.mean(axis=-1), color=OI_16['model'], lw=1, label='model estimate')
+            if filt.is_bias_aware:
+                row[0].plot(t, s['y'][w, 0], color=OI_16['corrected'], lw=1, ls='--', label='bias-corrected estimate')
+                row[1].plot(t, s['b'][w, 0], color=OI_16['bias'], lw=1, label='bias estimate')
+            row[1].plot(t, s['b_true'][w, 0], 'k', lw=1.6, zorder=0, label='truth')
+            row[0].set(ylabel=r'$\eta$', xlim=(t[0], t[-1]))
+            row[1].set(ylabel='$b$')
+            row[1].text(1., 1.02, name, transform=row[1].transAxes, ha='right', va='bottom', fontsize=9)
+            for ax in row:
+                ax.axvline(t_end, color='k', ls=':', lw=0.8)
+        for ax in axs[-1]:
+            ax.set_xlabel('$t$ (s)')
+        _legend_16(fig, axs)
+        plt.show()
+
+
+def plot_parameters_16(runs, truth_parameters, t_obs):
+    """The ensemble mean (line) and one standard deviation (band) of each estimated parameter over its true value,
+    for the runs of `runs` (``{name: filter}``), from the first to the last observation."""
+    colours = ('#666666', OI_16['model'], OI_16['corrected'], OI_16['bias'])
+    names = next(iter(runs.values())).est_alpha
+    symbol = dict(beta=r'\beta', zeta=r'\zeta', kappa=r'\kappa')
+    with plt.rc_context(TUTORIAL_STYLE):
+        fig, axs = plt.subplots(1, len(names), figsize=(WIDTH_16, 2.2), sharex=True, sharey=True)
+        for (name, filt), c in zip(runs.items(), colours):
+            model = filt.model
+            w = (model.hist_t >= t_obs[0] - 2 * model.dt) & (model.hist_t <= t_obs[-1])
+            for k, (ax, alpha) in enumerate(zip(axs, names)):
+                a = model.hist[w, model.Nphi + k] / truth_parameters[alpha]
+                ax.fill_between(model.hist_t[w], a.mean(-1) - a.std(-1), a.mean(-1) + a.std(-1), color=c, alpha=0.2, lw=0)
+                ax.plot(model.hist_t[w], a.mean(-1), color=c, lw=1, label=name)
+        for ax, alpha in zip(axs, names):
+            ax.axhline(1., color='k', lw=0.8, ls=':')
+            ax.set(xlabel='$t$ (s)', title=f'${symbol.get(alpha, alpha)}$ / truth', xlim=(t_obs[0], t_obs[-1]))
+        _legend_16(fig, axs)
+        plt.show()
+
+
+def plot_regularization_16(gammas, model_errors, corrected_errors, true_bias):
+    """The errors of the model estimate and of the bias-corrected estimate against the regularization factor; the
+    dotted line is the error of the truth without its bias, `true_bias`."""
+    x = np.arange(len(gammas))
+    with plt.rc_context(TUTORIAL_STYLE):
+        fig, ax = plt.subplots(figsize=(0.6 * WIDTH_16, 2.4))
+        ax.axhline(true_bias, color='k', ls=':', lw=0.8)
+        ax.text(x[-1] + 0.3, true_bias, ' true bias', va='bottom', ha='right', fontsize=9)
+        ax.plot(x, model_errors, 'o-', color=OI_16['model'], ms=4, lw=1, label='model estimate')
+        ax.plot(x, corrected_errors, 's--', color=OI_16['corrected'], ms=4, lw=1, label='bias-corrected estimate')
+        ax.set(xlabel=r'regularization factor, $\gamma$', ylabel='relative error', ylim=(0, None), xticks=x,
+               xticklabels=[f'{g:g}' for g in gammas])
+        _legend_16(fig, ax)
+        plt.show()
+
+
+def final_parameters(filt, t):
+    """The ensemble mean of the estimated parameters of `filt` at the time `t`, by name."""
+    model = filt.model
+    row = model.hist[np.argmin(abs(model.hist_t - t)), model.Nphi:model.Nphi + len(filt.est_alpha)]
+    return dict(zip(filt.est_alpha, row.mean(axis=-1)))

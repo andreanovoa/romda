@@ -11,21 +11,23 @@ from romda.utils import convert_to_python_type
 
 from ..model_config import MODEL_STORE, training_data_name
 from ..model_config import find_matching_config as _find_matching_config
-from .esn import ESN_model
+from .esn import LEGACY_CONVENTIONS, ESN_model, has_intercept, trained_scale_bias_in
 
 logger = logging.getLogger(__name__)
 
 #: the trained-network store is a project-local cache under results/ (gitignored)
 ESN_STORE = MODEL_STORE.with_name('esn_configs')
 
-#: INIT_KEYS added after networks were cached: `to_hash` drops each one at its
-#: default, so every hash taken before they joined still finds its network
+#: INIT_KEYS added after networks were cached: `to_hash` drops each one at the value that those networks were
+#: trained with, so every hash taken before they joined still finds its network. That value is the default of
+#: the option, or, for the conventions whose default changed afterwards, that of `LEGACY_CONVENTIONS`: a default
+#: configuration then has another hash than the networks of the former conventions
 HASHED_IF_NOT_DEFAULT = ('hyperparameters_to_optimize', 'bias_in_range', 'regularize_bias_out',
                          'stability_steps', 'bho_noise', 'grid_midpoints',
                          'optimize_parameter_normalization', 'param_shift_range',
                          'param_norm_range', 'patch_size', 'halo', 'periodic', 'shared', 'stability_starts',
                          'stability_penalty', 'sigma_param_range', 'centre_input', 'validation_metric',
-                         'param_in_reservoir', 'readout_input')
+                         'param_in_reservoir', 'readout_input', 'scale_bias_in')
 
 #: left unset when building a network at their default: EchoStateNetwork then searches the
 #: parameter normalization whenever input_parameters are given, over ranges sized from the
@@ -64,12 +66,16 @@ class ESNConfig:
     # ESN architecture parameters
     N_units: int = 50
     norm_method: str = 'range'
-    Win_type: str = 'sparse'
+    # the conventions of the network (see `ESN_model`); the published studies pin `LEGACY_CONVENTIONS`
+    Win_type: str = 'sparse_dense_bias'
+    scale_bias_in: bool = False
     N_wash: int = 5
     upsample:  int = 1
     bias_in: float = 0.1
+    # options of the echostatenetwork whose Wout holds the constant of the readout in its last row (<= 0.6): the
+    # constant that the row multiplies, and whether the Tikhonov factor acts on the row
     bias_out: float = 1.0
-    regularize_bias_out: bool = True
+    regularize_bias_out: bool = False
     connect: float = 3
     # parallel layout (echostatenetwork): one reservoir per patch of patch_size sites, reading halo sites on either
     # side; set before the trained matrices, whose shapes depend on it (independent patches, shared=False, are not
@@ -185,7 +191,7 @@ class ESNConfig:
         # observed_idx and tikh_range: arrays, tuples and lists all become lists
         hash_params = convert_to_python_type(hash_params)
         for key in HASHED_IF_NOT_DEFAULT:
-            if hash_params[key] == convert_to_python_type(getattr(ESNConfig, key)):
+            if hash_params[key] == convert_to_python_type(LEGACY_CONVENTIONS.get(key, getattr(ESNConfig, key))):
                 del hash_params[key]
 
         # A hyperparameter that is not searched is a setting, not a training result: its value keys the network.
@@ -238,6 +244,8 @@ class ESNConfig:
                 config_dict[f't_{key}'] = kwargs[f'N_{key}'] * kwargs['dt']
 
         init_config = cls(**config_dict)
+        # the convention that the network is trained with (echostatenetwork <= 0.6.0 has one)
+        init_config.scale_bias_in = trained_scale_bias_in(init_config.scale_bias_in)
         if init_config.N_dim == 0:
             assert 'data' in kwargs and kwargs['data'] is not None, "N_dim not provided and data not available to infer it."
             init_config.N_dim = kwargs['data'].shape[1]
@@ -255,6 +263,13 @@ class ESNConfig:
 
         config = asdict(self)
         config['y0'] = np.zeros((self.N_dim, 1))  # Dummy initial state
+        if has_intercept():
+            # the stored Wout is [Wout; constant row], which multiplies [r; bias_out]: the setter of Wout takes the
+            # last row as the intercept, once it carries bias_out, which the network has no more.
+            bias_out = float(np.ravel(config.pop('bias_out'))[0])
+            if config['Wout'] is not None and bias_out != 1.0:
+                config['Wout'] = np.array(config['Wout'], dtype=float)
+                config['Wout'][-1] *= bias_out
         # Parametric fields are absent/empty on non-parametric networks (and on
         # stores saved before they existed) — drop them so ESN_model's defaults apply
         for key in PARAM_NORM_KEYS:
@@ -298,6 +313,10 @@ class ESNConfig:
             if config_dict[key] == "none":
                 config_dict[key] = None
 
+        # a configuration saved before the conventions were options is that of a network trained with the former ones
+        config_dict = {**{key: LEGACY_CONVENTIONS[key] for key in ('scale_bias_in', 'regularize_bias_out')},
+                       **config_dict}
+
         if verbose:
             logger.debug('Configuration loaded from .../%s/esn_config.yaml', '/'.join(list(load_dir.parts)[-3:]))
         return cls(**config_dict)
@@ -310,6 +329,11 @@ class ESNConfig:
         Save large matrices and other metadata defined after training the network.
         """
         data_to_save = {key: getattr(esn_model, key, False) for key in TRAINED_KEYS }
+        # one layout of the store for every echostatenetwork: the constant of the readout is the last row of Wout
+        data_to_save['Wout'] = esn_model._readout_matrix()
+        # the input bias at full precision: the configuration file rounds it, and a network that was not given one
+        # is trained with a value taken from the data, which the reloaded network must run with to the last bit
+        data_to_save['bias_in'] = np.asarray(esn_model.bias_in, dtype=float)
 
         np.savez_compressed(save_dir / 'trained_matrices.npz', **data_to_save)
         logger.debug('Trained matrices saved to .../%s/trained_matrices.npz', '/'.join(list(save_dir.parts)[-3:]))
@@ -337,6 +361,8 @@ class ESNConfig:
                     item = item.item()
 
                 trained_dict[name] = item
+            if 'bias_in' in data:                   # absent from the stores written before it was saved here
+                trained_dict['bias_in'] = data['bias_in']
 
         return trained_dict
 

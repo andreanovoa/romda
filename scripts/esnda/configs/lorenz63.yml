@@ -32,6 +32,9 @@ forecast:
     # quarter of the units do, the tanh reservoir stays nearly odd and the filter fails on some reservoir seeds;
     # bias_in = mean |u_norm| of the training record (0.16, Racca & Magri's code), not 0.1
     Win_type: sparse_dense_bias
+    # conventions of the networks of the paper, pinned: they are not the defaults of romda
+    scale_bias_in: true             # sigma_in multiplies the input bias
+    regularize_bias_out: true       # the Tikhonov factor acts on the output bias
     bias_in: 0.16
 da:
   seed: 0

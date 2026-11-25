@@ -62,14 +62,17 @@ def build_rom(X_train, simulation_dir, use_cache=True, cfg=None, N_val=None, **o
     """Train (or load from cache) the POD-ESN reduced-order model.
 
     The last `N_val` snapshots of `X_train` (default: that of the configuration) validate the network.
-    The cache is named after the sizes of the model and a digest of its options, so that two
-    configurations on the same record do not share a network."""
+    The cache is named after the sizes of the model and a digest of its options and of the conventions of the
+    network (`ESN_model`), so that two configurations on the same record do not share a network."""
     cfg = cfg or CFG
     params = {**cfg['rom'], **overrides}
     N_val = cfg['data']['N_val'] if N_val is None else N_val
     params.setdefault('t_train', (X_train.shape[1] - N_val) * params['dt'])
     params.setdefault('t_val', N_val * params['dt'])
-    digest = hashlib.sha1(json.dumps(params, sort_keys=True, default=str).encode()).hexdigest()[:8]
+    # the conventions of the network key the cache with the options, so that a model cached under former
+    # defaults does not answer for the configuration
+    keyed = {**{key: getattr(POD_ESN, key) for key in ('Win_type', 'scale_bias_in', 'regularize_bias_out')}, **params}
+    digest = hashlib.sha1(json.dumps(keyed, sort_keys=True, default=str).encode()).hexdigest()[:8]
     case_filename = (f"{simulation_dir}POD{params['N_modes']}_ESN{params['N_units']}"
                      f"_Ntrain{X_train.shape[1]}_{digest}")
 

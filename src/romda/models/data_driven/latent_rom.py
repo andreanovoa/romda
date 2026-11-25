@@ -371,7 +371,11 @@ class LatentROM(Projector):
             state["_down_sample_measurement"] = (int(dsm), int(dsm))
         elif dsm is not None:
             state["_down_sample_measurement"] = tuple(int(step) for step in dsm)
-        self.__dict__.update(state)
+        restore = getattr(super(), "__setstate__", None)    # the forecaster's own (`ESN_model.__setstate__`)
+        if restore is None:
+            self.__dict__.update(state)
+        else:
+            restore(state)
 
     def __post_init__(self) -> None:
         """Runs the `__post_init__` of the base class being constructed."""

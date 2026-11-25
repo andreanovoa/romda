@@ -26,7 +26,7 @@ Select a topic to list its notebooks.
     | [Real-time DA intro](tutorials/1_Introduction_to_real-time_DA/10_real-time-DA_intro.md) | Bayesian estimation (MAP, univariate example) and the classical Kalman filter on a linear model. |
     | [Ensemble DA intro](tutorials/1_Introduction_to_real-time_DA/11_ensemble-DA_intro.md) | The EnKF: twin experiment on the Van der Pol model, and Monte Carlo convergence to the KF. |
     | [Augmented formulation](tutorials/1_Introduction_to_real-time_DA/13_real-time-DA-augmented-state.md) | Combined state and parameter estimation. |
-    | [Chaos and DA (Lorenz 63)](tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md) | Ensemble DA on a chaotic system. |
+    | [Chaos and DA (Lorenz 63)](tutorials/1_Introduction_to_real-time_DA/15_real-time-DA_Lorenz63.md) | Ensemble DA on a chaotic system: sampling frequency against the Lyapunov time, inflation, and the Kuramoto–Sivashinsky equation. |
     | [Model-bias-aware DA](tutorials/1_Introduction_to_real-time_DA/16_Bias-aware_real-time_DA.md) | The r-EnKF with an ESN bias estimator on the Van der Pol model. |
     | [Bimodal posterior (Gaussian mixture)](tutorials/1_Introduction_to_real-time_DA/17_Gaussian_mixture_ensemble_filter.md) | Lorenz-63 observed through $z$ alone: the bimodal posterior and the Gaussian-mixture ensemble filter. |
 

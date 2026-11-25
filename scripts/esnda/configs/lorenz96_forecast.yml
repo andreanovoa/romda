@@ -24,4 +24,7 @@ forecast:
     noise: 0.0                # no added training noise: the record already carries the noise of truth.noise_level
     seed: 0
     Win_type: sparse_dense_bias   # every unit sees the input bias; b_in = mean |u_norm| (Racca & Magri)
+    # conventions of the networks of the paper, pinned: they are not the defaults of romda
+    scale_bias_in: true             # sigma_in multiplies the input bias
+    regularize_bias_out: true       # the Tikhonov factor acts on the output bias
     bias_in: 0.152

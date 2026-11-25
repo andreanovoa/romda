@@ -20,7 +20,8 @@ CACHED = dict(N_dim=3, N_folds=4, N_func_evals=20, N_grid=4, N_initial_rand=0, N
               observed_idx=[0, 2], rho_range=[0.2, 1.0], seed=0, sigma_in_range=[-2, 1],
               t_test=5.5, t_train=110.0, t_val=5.5, tikh_range=[1e-6, 1e-9, 1e-12],
               training_data_filename='Lorenz63_default_Nlyap300_noise0.02_seed0',
-              update_reservoir=True, update_state=True, upsample=2)
+              update_reservoir=True, update_state=True, upsample=2,
+              scale_bias_in=True, regularize_bias_out=True)     # the conventions of the cached network, pinned
 
 
 CACHED_HASH = '1afa29689edcdc37'
@@ -41,6 +42,84 @@ def test_default_search_keeps_the_cached_hash():
     assert ESNConfig.from_init_params(**explicit).to_hash() == CACHED_HASH
 
 
+def test_a_default_configuration_does_not_find_a_network_of_the_former_conventions(tmp_path):
+    """The defaults of the conventions changed after networks were cached (`LEGACY_CONVENTIONS`). A configuration
+    that pins the former values keeps the hash of its cached network; one that leaves any of them at its default
+    has another hash, so the cached network does not answer for it. A configuration file saved before the
+    conventions were options is that of a network of the former ones."""
+    import yaml
+    from romda.models.data_driven.rnns.esn import LEGACY_CONVENTIONS
+
+    assert all(CACHED[key] == value for key, value in LEGACY_CONVENTIONS.items())
+    assert ESNConfig(**CACHED).to_hash() == CACHED_HASH
+    hashes = {CACHED_HASH}
+    for dropped in (['Win_type'], ['scale_bias_in'], ['regularize_bias_out'], list(LEGACY_CONVENTIONS)):
+        config = ESNConfig(**{key: value for key, value in CACHED.items() if key not in dropped})
+        assert all(getattr(config, key) != LEGACY_CONVENTIONS[key] for key in dropped)
+        hashes.add(config.to_hash())
+    assert len(hashes) == 5
+    assert ESNConfig(N_dim=3).to_hash() != ESNConfig(N_dim=3, **LEGACY_CONVENTIONS).to_hash()
+
+    stored = {key: value for key, value in CACHED.items() if key not in ('scale_bias_in', 'regularize_bias_out')}
+    (tmp_path / 'esn_config.yaml').write_text(yaml.dump(stored))
+    loaded = ESNConfig.load(tmp_path)
+    assert loaded.scale_bias_in is True and loaded.regularize_bias_out is True
+    assert loaded.to_hash() == CACHED_HASH
+
+
+def test_the_conventions_that_the_installed_echostatenetwork_cannot_give(tmp_path):
+    """echostatenetwork <= 0.6.0 multiplies the input bias by sigma_in: a network asked for scale_bias_in=False is
+    trained, hashed and stored with True, with a warning. The echostatenetwork with the intercept cannot train a
+    network whose Tikhonov factor acts on the constant of the readout, and says so."""
+    import pytest
+    from echostatenetwork import EchoStateNetwork
+    from romda.models.data_driven.rnns.esn import has_intercept
+
+    kwargs = _small_network(config_dir=tmp_path, hyperparameters_to_optimize=[], rho=0.5, sigma_in=0.5, tikh=1e-6)
+    if hasattr(EchoStateNetwork, 'scale_bias_in'):
+        trained = auto_load_or_create(**kwargs)
+        assert trained.scale_bias_in is False
+        assert ESNConfig.from_init_params(**kwargs).to_hash() != \
+            ESNConfig.from_init_params(**kwargs, scale_bias_in=True).to_hash()
+    else:
+        with pytest.warns(UserWarning, match='scale_bias_in=False'):
+            trained = auto_load_or_create(**kwargs)
+        assert trained.scale_bias_in is True
+        with pytest.warns(UserWarning, match='scale_bias_in=False'):
+            assert ESNConfig.from_init_params(**kwargs).to_hash() == \
+                ESNConfig.from_init_params(**kwargs, scale_bias_in=True).to_hash()
+    (saved,) = tmp_path.iterdir()
+    assert ESNConfig.load(saved).scale_bias_in is trained.scale_bias_in
+
+    if has_intercept():
+        with pytest.raises(ValueError, match='regularize_bias_out=True'):
+            ESN_model(**{**kwargs, 'regularize_bias_out': True})
+    else:
+        assert ESN_model(**{**kwargs, 'regularize_bias_out': True}).regularize_bias_out is True
+
+
+def test_a_network_pickled_before_the_conventions_keeps_the_former_ones():
+    """A pickle without the conventions in its state holds a network trained with the former ones, with the constant
+    of the readout in the last row of `Wout`: it is restored as that network, and the defaults do not replace its
+    conventions. A copy keeps the conventions of its network."""
+    from romda.models.data_driven.rnns.esn import has_intercept
+
+    kwargs = _small_network(hyperparameters_to_optimize=[], rho=0.5, sigma_in=0.5, tikh=1e-6)
+    esn = ESN_model(**kwargs)
+    assert esn.copy().scale_bias_in is esn.scale_bias_in and esn.copy().regularize_bias_out is False
+    r = np.random.default_rng(0).standard_normal((20, 3))
+
+    state = dict(esn.__getstate__())
+    del state['scale_bias_in'], state['regularize_bias_out']
+    state['_Wout'] = esn._readout_matrix()
+    if has_intercept():
+        del state['_intercept']
+    old = ESN_model.__new__(ESN_model)
+    old.__setstate__(state)
+    assert old.scale_bias_in is True and old.regularize_bias_out is True
+    np.testing.assert_allclose(old.reservoir_to_physical(r), esn.reservoir_to_physical(r))
+
+
 def test_the_settings_of_a_network_key_the_hash():
     """Every setting of the network, of its search and of its training data enters the hash; the defaults leave it
     at the hash of a network cached before they existed."""
@@ -53,7 +132,8 @@ def test_the_settings_of_a_network_key_the_hash():
 
     # the search settings
     apart(CACHED, dict(hyperparameters_to_optimize=('rho', 'sigma_in', 'tikh', 'bias_in')),
-          dict(bias_in_range=(0.0, 1.0)), dict(regularize_bias_out=False), dict(stability_steps=1350),
+          dict(bias_in_range=(0.0, 1.0)), dict(regularize_bias_out=False), dict(scale_bias_in=False),
+          dict(stability_steps=1350),
           dict(bho_noise='gaussian'), dict(grid_midpoints=True), dict(optimize_parameter_normalization=True),
           dict(param_shift_range=(3.5, 8.0)), dict(param_norm_range=(1.0, 20.0)))
     # `from_init_params` is how `auto_load_or_create` keys a query: the options must reach the hash
@@ -109,12 +189,14 @@ def test_the_training_data_are_keyed_by_their_name_and_content():
 
 def test_esn_defaults_match_the_store_defaults():
     """The defaults dropped from the hash are the class defaults of echostatenetwork:
-    a network trained without the option is the network trained with its default."""
+    a network trained without the option is the network trained with its default. The conventions of the network
+    are those of `ESN_model`, whatever the defaults of the installed echostatenetwork."""
     from echostatenetwork import EchoStateNetwork
     for key in ('stability_steps', 'stability_starts', 'stability_penalty', 'bho_noise', 'grid_midpoints', 'bias_in_range',
-                'regularize_bias_out', 'optimize_parameter_normalization', 'param_shift_range',
-                'param_norm_range'):
+                'optimize_parameter_normalization', 'param_shift_range', 'param_norm_range'):
         assert getattr(EchoStateNetwork, key) == getattr(ESNConfig, key), key
+    for key in ('Win_type', 'scale_bias_in', 'regularize_bias_out'):
+        assert getattr(ESN_model, key) == getattr(ESNConfig, key), key
 
 
 def _small_network(**kwargs):
@@ -173,6 +255,33 @@ def test_search_options_round_trip_through_the_store(tmp_path):
     np.testing.assert_allclose(loaded.Wout, plain.Wout)
 
 
+def test_the_store_keeps_the_constant_of_the_readout_in_wout(tmp_path):
+    """The store holds the readout as ``[Wout; constant row]``, which multiplies ``[r; bias_out]``, with every
+    echostatenetwork: the layout of the networks stored before the intercept left `Wout`. Such a network loads to
+    the same readout, the value of `bias_out` in its configuration included, and its input bias stays inside the
+    input scaling, whatever the default of the installed echostatenetwork."""
+    import yaml
+    from romda.models.data_driven.rnns import load_esn_model_from_config
+
+    trained = auto_load_or_create(**_small_network(config_dir=tmp_path))
+    (saved,) = tmp_path.iterdir()
+    with np.load(saved / 'trained_matrices.npz', allow_pickle=True) as data:
+        W = data['Wout']
+    assert W.shape == (20 + 1, 2)
+    r = np.random.default_rng(0).standard_normal((20, 3))
+    np.testing.assert_allclose(trained.reservoir_to_physical(r), W[:-1].T @ r + W[-1][:, None])
+    loaded = load_esn_model_from_config(saved.name, tmp_path)
+    np.testing.assert_array_equal(loaded.reservoir_to_physical(r), trained.reservoir_to_physical(r))
+    np.testing.assert_array_equal(loaded._readout_matrix(), W)
+
+    config = yaml.safe_load((saved / 'esn_config.yaml').read_text())
+    del config['scale_bias_in']                 # the stores written before the option
+    (saved / 'esn_config.yaml').write_text(yaml.dump(dict(config, bias_out=[2.0])))
+    loaded = load_esn_model_from_config(saved.name, tmp_path)
+    assert loaded.scale_bias_in is True
+    np.testing.assert_allclose(loaded.reservoir_to_physical(r), W[:-1].T @ r + 2.0 * W[-1][:, None])
+
+
 def test_layouts_round_trip_through_the_store(tmp_path):
     """The store keeps the parallel layout of echostatenetwork, and a parametric network that reads its parameter in
     the readout only (W_out on [r; p; 1], no parameter column in W_in), which is a different network from the one that
@@ -187,6 +296,7 @@ def test_layouts_round_trip_through_the_store(tmp_path):
         loaded = auto_load_or_create(**kwargs)
     assert (loaded.patch_size, loaded.halo, loaded.periodic, loaded.N_r) == (2, 1, True, 80)
     np.testing.assert_array_equal(loaded.Wout, trained.Wout)
+    np.testing.assert_array_equal(loaded.bias_in, trained.bias_in)      # set from the data, kept to the last bit
     u, r = data[0, :1].T, np.zeros((80, 1))
     for _ in range(5):
         (u1, _), (u, r) = trained.step(u, r), loaded.step(u, r)
@@ -201,7 +311,7 @@ def test_layouts_round_trip_through_the_store(tmp_path):
     hashes = {ESNConfig.from_init_params(**k).to_hash() for k in (kwargs, readout)}
     assert len(hashes) == 2
     trained = auto_load_or_create(**readout)
-    assert trained.Wout.shape[0] == 20 + 1 + 1 and trained.Win[:, 2].nnz == 0   # [r; a; 1], a not in W_in
+    assert trained._readout_matrix().shape[0] == 20 + 1 + 1 and trained.Win[:, 2].nnz == 0   # [r; a; 1], a not in W_in
     with mock.patch.object(ESN_model, 'train', side_effect=AssertionError('retrained')):
         loaded = auto_load_or_create(**readout)
     assert (loaded.param_in_reservoir, loaded.readout_input) == (False, 'params')

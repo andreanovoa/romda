@@ -184,7 +184,7 @@ def test_logarithmic_singular_values_read_out_the_same_network():
 
 def test_readout_directions_add_their_coordinates_times_the_projected_reservoir():
     # est_alpha=['Wdir']: member j reads out with Wout + Wout_dirs C_j. With zero coordinates the forecast is
-    # the plain network's; with coordinates C, the first output step differs by C (Wout_dirs^T [r; b_out]),
+    # the plain network's; with coordinates C, the first output step differs by C (Wout_dirs^T [r; 1]),
     # because the reservoir update of that step does not depend on the read-out.
     k = 2
     dirs = np.random.default_rng(1).standard_normal((N_UNITS + 1, k))
@@ -205,7 +205,7 @@ def test_readout_directions_add_their_coordinates_times_the_projected_reservoir(
     psi_p, _ = plain.time_step(Nt=1)
     r1 = psi_p[1, 3:3 + N_UNITS]                                         # (N_units, m), the same in both
     assert np.allclose(psi_w[1, 3:3 + N_UNITS], r1)
-    proj = dirs.T @ np.vstack([r1, plain.bias_out * np.ones((1, M))])    # (k, m)
+    proj = dirs.T @ plain._augmented(r1)                                 # (k, m)
     assert np.allclose(psi_w[1, :3] - psi_p[1, :3], np.einsum('kqm,km->qm', C, proj))
 
 
