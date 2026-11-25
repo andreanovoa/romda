@@ -1,5 +1,5 @@
 # Real-time DA with the CAE-ESN on the Kuramoto-Sivashinsky equation (Özalp, Nóvoa & Magri 2026), the case of
-# tutorial 45. Run by scripts/caeesnda/cae_esn_da.py: the CAE-ESN is a data-driven ROM, not a model of romda.run.
+# tutorial 43. Run by scripts/caeesnda/cae_esn_da.py: the CAE-ESN is a data-driven ROM, not a model of romda.run.
 name: ks
 
 forecast:

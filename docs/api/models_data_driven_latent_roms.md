@@ -234,9 +234,9 @@ filter_ens = run_da_loop(ensemble, truth, std_obs=0.05, t_extra=0.5)
 
 The filter can only correct what the forecaster can represent, so measure the closed-loop
 forecast skill of the trained model before data assimilation. The tutorials
-[45_DA_CAE_ESN_KS.ipynb](../tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md)
+[43_DA_CAE_ESN_KS.ipynb](../tutorials/4_Real-time_DA_ROMs/43_DA_CAE_ESN_KS.md)
 (Kuramoto–Sivashinsky) and
-[46_DA_CAE_ESN_Kolmogorov.ipynb](../tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md)
+[44_DA_CAE_ESN_Kolmogorov.ipynb](../tutorials/4_Real-time_DA_ROMs/44_DA_CAE_ESN_Kolmogorov.md)
 (Kolmogorov flow) assimilate sensor data into a CAE-ESN, and
 [`scripts/caeesnda`](https://github.com/andreanovoa/romda/tree/main/scripts/caeesnda) holds
 their configurations.

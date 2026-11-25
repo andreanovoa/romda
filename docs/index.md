@@ -69,6 +69,7 @@ This filter is the regularized bias-aware EnKF of Nóvoa, Racca & Magri (2023), 
   observations relate.
 - [API reference](api/index.md) — browse models, estimators, observations, and bias estimators.
 - [Tutorials](tutorials.md) — follow the notebooks from core classes to reduced-order models.
+- [Publications](publications.md) — the works produced with `romda`, and the replications of their results.
 - Sibling packages: [`dynamodels`](https://andreanovoa.github.io/dynamodels/) (the
   physical models) and [`ntsa`](https://andreanovoa.github.io/ntsa/) (nonlinear
   time-series analysis), both usable independently of `romda`.

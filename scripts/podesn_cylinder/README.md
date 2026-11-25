@@ -27,7 +27,7 @@ number of sensors, the covariance inflation and the online estimation of the out
   the current code (see [Replication of the paper](#replication-of-the-paper)).
 
 This case accompanies the tutorials `31_POD_SPOD.ipynb`, `35_POD_ESN_cylinder.ipynb` and
-`44_DA_POD_ESN_cylinder.ipynb` (topics 3 and 4 of the [tutorials](../../../tutorials/README.md)).
+`42_DA_POD_ESN_cylinder.ipynb` (topics 3 and 4 of the [tutorials](../../../tutorials/README.md)).
 
 ## Data
 

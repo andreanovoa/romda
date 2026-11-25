@@ -1,4 +1,4 @@
-"""Helpers of tutorials 40-43, the washout-free deployment of echo state networks: the configurations of the study in
+"""Helpers of tutorials 40 and 41, the washout-free deployment of echo state networks: the configurations of the study in
 `scripts/esnda`, the closed-loop forecasts after a washout, and the figures.
 
 Colours (Okabe-Ito): the true state is grey or black, the ensemble filter blue, the substitution of the data

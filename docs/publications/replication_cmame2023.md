@@ -36,7 +36,7 @@ Without regularization, the filter keeps the bias: the biased error is 0.47–0.
 is the norm of the true bias (0.165). One result differs from the paper: $L = 1$ with augmentation behaves as
 $L = 10$ and $L = 50$, whereas the paper finds it almost insensitive to $\gamma$.
 
-![Figure 6 of the paper with the current code](../../figs/replications/cmame2023/vdp_fig06.png)
+![Figure 6 of the paper with the current code](../figs/replications/cmame2023/vdp_fig06.png)
 
 *Figure 6. Van der Pol oscillator, seed 0: RMS errors after the assimilation for four training sets of the bias
 network and three regularization factors.*
@@ -52,7 +52,7 @@ with $\gamma$. The combination $(\beta - \zeta)/\kappa$ is better
 identified than each parameter: it stays within 25 % of the truth for $5 \leq \gamma \leq 10$ and within 36 % for
 larger $\gamma$, whereas $\beta$ alone spans a factor of four.
 
-![The combination of the Van der Pol parameters over six seeds](../../figs/replications/cmame2023/vdp_fig08_ratio.png)
+![The combination of the Van der Pol parameters over six seeds](../figs/replications/cmame2023/vdp_fig08_ratio.png)
 
 *$(\beta - \zeta)/\kappa$ at the end of the assimilation over its true value, for six seeds and (a) $L = 1$,
 (b) $L = 10$ and (c) $L = 50$. The band spans the seeds.*
@@ -68,7 +68,7 @@ The parameters themselves scatter more, as the table and the figure below show.
 | 50 | 5–10 | 0.86–1.40 | 0.68–1.22 | 0.79–1.09 | 4.7–6.6 | 100 % |
 | 50 | 11–20 | 0.36–1.55 | 0.27–1.41 | 0.47–1.07 | 3.9–8.0 | 93 % |
 
-![Van der Pol oscillator over six seeds](../../figs/replications/cmame2023/vdp_fig08_seeds.png)
+![Van der Pol oscillator over six seeds](../figs/replications/cmame2023/vdp_fig08_seeds.png)
 
 *Figure 8 over six seeds (markers; lines: seed 0), for $L = 1$, 10 and 50 (top to bottom). Left: RMS errors after
 the assimilation. Centre: parameters at the end of the assimilation over their initial mean; dotted lines are the
@@ -88,7 +88,7 @@ norm of the true bias for $\gamma \geq 5$. The parameters do not reach the truth
 $\zeta$ between 18 and 60, and $(\beta - \zeta)/\kappa$ between 3.2 and 5.0. Up to 76 analyses are rejected
 because members cross the limits of the parameters, which confounds this comparison.
 
-![Van der Pol oscillator with a prior far from the truth](../../figs/replications/cmame2023/vdp_fig08_far_prior.png)
+![Van der Pol oscillator with a prior far from the truth](../figs/replications/cmame2023/vdp_fig08_far_prior.png)
 
 *Figure 8 with the prior far from the truth, seed 0, for $L = 1$, 10 and 50 (top to bottom). (a, e, i) RMS errors
 against $\gamma$; (b, f, j) parameters at the end of the assimilation over their true values; (c, g, k) biased and
@@ -114,12 +114,12 @@ Three results differ from the paper.
 - **Unbiased error with the nonlinear bias.** It depends on the trained network: 0.27 at the optimum of the paper,
   against 0.079 in the paper.
 
-![Figure 10 of the paper with the current code](../../figs/replications/cmame2023/rijke_fig10.png)
+![Figure 10 of the paper with the current code](../figs/replications/cmame2023/rijke_fig10.png)
 
 *Figure 10. Rijke tube: sum of the biased and unbiased RMS errors after the assimilation against the regularization
 factor and the number of training sets, for (a) the linear and (b) the nonlinear bias. Stars: optimum.*
 
-![Figure 11 of the paper with the current code](../../figs/replications/cmame2023/rijke_fig11.png)
+![Figure 11 of the paper with the current code](../figs/replications/cmame2023/rijke_fig11.png)
 
 *Figure 11. Rijke tube with (a–d) the linear and (e–h) the nonlinear bias.
 (a, e) RMS errors and (b, f) parameters over their true values against $\gamma$; (c, g) biased and (d, h) unbiased

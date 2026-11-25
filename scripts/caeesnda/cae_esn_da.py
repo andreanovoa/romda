@@ -1,6 +1,6 @@
 """Real-time data assimilation with the convolutional autoencoder echo state network (CAE-ESN).
 
-The cases of Özalp, Nóvoa & Magri (2026), as in tutorials 45 (Kuramoto-Sivashinsky) and 46 (Kolmogorov flow):
+The cases of Özalp, Nóvoa & Magri (2026), as in tutorials 43 (Kuramoto-Sivashinsky) and 44 (Kolmogorov flow):
 a trained autoencoder compresses the snapshots, an echo state network is trained on the reduced coordinates, and
 the EnKF assimilates sparse, noisy measurements of the field into an ensemble of CAE-ESNs that starts unrelated to
 the true state. The settings are in ``ks.yml`` and ``kolmogorov.yml`` next to this script:

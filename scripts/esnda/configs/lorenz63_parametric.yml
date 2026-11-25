@@ -1,14 +1,14 @@
 # Parametric ESN-DA: Lorenz-63 trained across rho = 24-38 (chaotic across the range),
 # deployed on a fresh truth at an unseen rho with rho estimated online. The truth and
 # forecast values mirror dev/ESN-DA/defaults.LORENZ63_PARAMETRIC exactly; the da and
-# window blocks are the recipe of the first version of tutorial 43; the tutorial
-# (tutorials/4_Real-time_DA_ROMs/43_DA_parameter_estimation.ipynb) now observes every 6 steps and varies Nt_obs.
+# window blocks are the recipe of the first version of tutorial 41; the tutorial
+# (tutorials/4_Real-time_DA_ROMs/41_DA_parameter_estimation.ipynb) now observes every 6 steps and varies Nt_obs.
 name: lorenz63_parametric
 truth:
   model: Lorenz63
   params:
     dt: 0.02          # truth constructor kwarg (also seeds the training trajectories)
-  noise_level: 0.02   # the training segments and the fresh truth trajectory (tutorial 43); lorenz63.yml has 5%
+  noise_level: 0.02   # the training segments and the fresh truth trajectory (tutorial 41); lorenz63.yml has 5%
 forecast:
   kind: parametric_esn
   train:
@@ -45,10 +45,10 @@ da:
   seed: 0
   n_measured: 3
   da_method: EnSRKF
-  m: 64               # tutorial 43
-  Nt_obs: 28          # tutorial 43: 0.5 Lyapunov times (of 55 steps each) between observations
-  std_obs: 0.05       # tutorial 43
-  inflation: 1.0       # tutorial 43 (the default of the estimator)
+  m: 64               # tutorial 41
+  Nt_obs: 28          # tutorial 41: 0.5 Lyapunov times (of 55 steps each) between observations
+  std_obs: 0.05       # tutorial 41
+  inflation: 1.0       # tutorial 41 (the default of the estimator)
   inflation_guard: true       # lambda~ = 1 while the forecast variance at the sensors exceeds tr C_dd
   inflation_average: plain    # a running mean of lambda~, clipped to [1, inflation_max^2] at every analysis
   inflation_rate: 0.1         # its weight: about the last ten analyses
@@ -57,6 +57,6 @@ da:
   adaptive_inflation: false   # true: the factor of Evensen (2009, Sect. 15.3) at each analysis,
                               # in place of inflation
   inflate_parameters: true    # false: the inflation acts on the state rows only
-  rho_true: 33.5      # between two training values (tutorial 43); the study axes live in the run script
-# tutorial 43: the first observation at 0.4 Lyapunov times, 30 Lyapunov times of assimilation
+  rho_true: 33.5      # between two training values (tutorial 41); the study axes live in the run script
+# tutorial 41: the first observation at 0.4 Lyapunov times, 30 Lyapunov times of assimilation
 window_lyap: [0.4, 30.0, 4.0]

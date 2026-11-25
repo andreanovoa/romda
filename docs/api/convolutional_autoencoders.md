@@ -218,9 +218,9 @@ cae_kf = MultiScaleCAE(n_latent=16).fit(W)     # W: vorticity, shape (1, N_t, 48
 
 
 The tutorials
-[45_DA_CAE_ESN_KS.ipynb](../tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md)
+[43_DA_CAE_ESN_KS.ipynb](../tutorials/4_Real-time_DA_ROMs/43_DA_CAE_ESN_KS.md)
 (Kuramoto–Sivashinsky) and
-[46_DA_CAE_ESN_Kolmogorov.ipynb](../tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md)
+[44_DA_CAE_ESN_Kolmogorov.ipynb](../tutorials/4_Real-time_DA_ROMs/44_DA_CAE_ESN_Kolmogorov.md)
 (Kolmogorov flow) train these autoencoders inside a CAE-ESN and assimilate sensor data into it.
 
 ::: romda.models.data_driven.autoencoders.cae_esn.CAE1D

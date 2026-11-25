@@ -1,4 +1,4 @@
-# Real-time DA with the CAE-ESN on the Kolmogorov flow (Re = 30, 48 x 48, vorticity), the case of tutorial 46.
+# Real-time DA with the CAE-ESN on the Kolmogorov flow (Re = 30, 48 x 48, vorticity), the case of tutorial 44.
 # Run by scripts/caeesnda/cae_esn_da.py. The record was computed with jax-cfd and is not distributed with romda:
 # the script reads it from $DATA_ROOT/<forecast.record.path>.
 name: kolmogorov

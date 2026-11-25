@@ -120,16 +120,16 @@ nav:
           - Rijke tube — model and DA: tutorials/2_Real-time_DA_Thermoacoustics/20_Rijke_LOM_and_DA.md
           - TABADA Rijke (CMAME): tutorials/2_Real-time_DA_Thermoacoustics/21_TABADA_Rijke_CMAME.md
           - Annular combustor — model, data and digital twin: tutorials/2_Real-time_DA_Thermoacoustics/22_TA_azimuthal_LOM_data_and_DA.md
-          - "Replication: CMAME 2023, regularized bias-aware EnKF": tutorials/2_Real-time_DA_Thermoacoustics/23_Replication_CMAME2023.md
       - 3. Introduction to reduced-order models:
           - POD / SPOD: tutorials/3_Introduction_to_ROMs/31_POD_SPOD.md
           - POD-ESN on the cylinder wake: tutorials/3_Introduction_to_ROMs/35_POD_ESN_cylinder.md
       - 4. Real-time DA on reduced-order models:
-          - Washout-free ESN, Lorenz 63: tutorials/4_Real-time_DA_ROMs/40_DA_ESN_Lorenz63.md
-          - Washout-free ESN, Lorenz 96: tutorials/4_Real-time_DA_ROMs/41_DA_ESN_Lorenz96.md
-          - Washout-free ESN, partial observations: tutorials/4_Real-time_DA_ROMs/42_DA_partial_observations.md
-          - Parametric ESN, state and parameter estimation: tutorials/4_Real-time_DA_ROMs/43_DA_parameter_estimation.md
-          - Real-time DA with POD-ESN: tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md
-          - Real-time DA with CAE-ESN, Kuramoto–Sivashinsky: tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md
-          - Real-time DA with CAE-ESN, Kolmogorov flow: tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md
-          - "Replication: ICCS 2025, POD-ESN of the cylinder wake": tutorials/4_Real-time_DA_ROMs/47_Replication_ICCS2025.md
+          - Washout-free ESN: tutorials/4_Real-time_DA_ROMs/40_DA_washout_free_ESN.md
+          - Parametric ESN, state and parameter estimation: tutorials/4_Real-time_DA_ROMs/41_DA_parameter_estimation.md
+          - Real-time DA with POD-ESN: tutorials/4_Real-time_DA_ROMs/42_DA_POD_ESN_cylinder.md
+          - Real-time DA with CAE-ESN, Kuramoto–Sivashinsky: tutorials/4_Real-time_DA_ROMs/43_DA_CAE_ESN_KS.md
+          - Real-time DA with CAE-ESN, Kolmogorov flow: tutorials/4_Real-time_DA_ROMs/44_DA_CAE_ESN_Kolmogorov.md
+  - Publications:
+      - Overview: publications.md
+      - "Replication: CMAME 2023, regularized bias-aware EnKF": publications/replication_cmame2023.md
+      - "Replication: ICCS 2025, POD-ESN of the cylinder wake": publications/replication_iccs2025.md

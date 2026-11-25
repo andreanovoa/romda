@@ -30,7 +30,7 @@ root-mean-square of the true field, over the assimilation window and the forecas
 - Racca, Doan & Magri (2023). Predicting turbulent dynamics with the convolutional autoencoder echo state network.
   *Journal of Fluid Mechanics* 975, A2. The multi-scale autoencoder of the Kolmogorov flow.
 
-This folder accompanies the tutorials `45_DA_CAE_ESN_KS.ipynb` and `46_DA_CAE_ESN_Kolmogorov.ipynb` (topic 4 of
+This folder accompanies the tutorials `43_DA_CAE_ESN_KS.ipynb` and `44_DA_CAE_ESN_Kolmogorov.ipynb` (topic 4 of
 the [tutorials](../../tutorials/README.md)), which explain each step.
 
 ## Data

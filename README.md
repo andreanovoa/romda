@@ -144,6 +144,8 @@ multiprocessing pool, so, in a script, keep the code under `if __name__ == "__ma
 
 ## 📚 Main publications from this repository
 
+The [Publications](https://andreanovoa.github.io/romda/publications/) page of the documentation lists these works with the replications of their results with the current code.
+
 ##### Journal papers
 
 - [x] Nóvoa, Noiray, Dawson & Magri (2024). A real-time digital twin of azimuthal thermoacoustic instabilities. Journal of Fluid Mechanics. [Published paper](https://doi.org/10.1017/jfm.2024.1052) |  🏷️ [v1.0](https://github.com/andreanovoa/romda/releases/tag/v1.0) | 📁 [`scripts/thermoacoustics`](scripts/thermoacoustics/README.md). 

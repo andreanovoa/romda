@@ -109,7 +109,7 @@ def on_pre_build(config, **kwargs):
         shutil.rmtree(topic_dest, ignore_errors=True)
         topic_dest.mkdir(parents=True)
 
-    # Hand-written pages of a topic (e.g. the replications of published papers), named like
+    # Hand-written pages of a topic, named like
     # the notebooks with a two-digit prefix, are copied next to the rendered notebooks.
     for topic in RENDERED_TOPICS:
         for md_path in sorted((SRC / topic).glob("[0-9][0-9]_*.md")):
@@ -126,8 +126,33 @@ def on_pre_build(config, **kwargs):
         )
 
 
+# Pages that moved: old URL (relative to the site root) -> new URL. A redirect page is written at each old URL.
+REDIRECTS = {
+    "tutorials/4_Real-time_DA_ROMs/40_DA_ESN_Lorenz63": "tutorials/4_Real-time_DA_ROMs/40_DA_washout_free_ESN",
+    "tutorials/4_Real-time_DA_ROMs/41_DA_ESN_Lorenz96": "tutorials/4_Real-time_DA_ROMs/40_DA_washout_free_ESN",
+    "tutorials/4_Real-time_DA_ROMs/42_DA_partial_observations": "tutorials/4_Real-time_DA_ROMs/40_DA_washout_free_ESN",
+    "tutorials/4_Real-time_DA_ROMs/43_DA_parameter_estimation": "tutorials/4_Real-time_DA_ROMs/41_DA_parameter_estimation",
+    "tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder": "tutorials/4_Real-time_DA_ROMs/42_DA_POD_ESN_cylinder",
+    "tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS": "tutorials/4_Real-time_DA_ROMs/43_DA_CAE_ESN_KS",
+    "tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov": "tutorials/4_Real-time_DA_ROMs/44_DA_CAE_ESN_Kolmogorov",
+    "tutorials/2_Real-time_DA_Thermoacoustics/23_Replication_CMAME2023": "publications/replication_cmame2023",
+    "tutorials/4_Real-time_DA_ROMs/47_Replication_ICCS2025": "publications/replication_iccs2025",
+}
+
+
+def write_redirects(site_dir):
+    for old, new in REDIRECTS.items():
+        page = site_dir / old / "index.html"
+        url = "../" * len(Path(old).parts) + new + "/"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text(f'<!doctype html>\n<meta charset="utf-8">\n<title>Moved</title>\n'
+                        f'<link rel="canonical" href="{url}">\n<meta http-equiv="refresh" content="0; url={url}">\n'
+                        f'<p>This page has moved to <a href="{url}">{url}</a>.</p>\n', encoding="utf-8")
+
+
 def on_post_build(config, **kwargs):
     site_dir = Path(config["site_dir"])
+    write_redirects(site_dir)
     dark = prepare_figures(site_dir)
 
     def tag_dark(m, html_dir):

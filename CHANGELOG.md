@@ -9,6 +9,14 @@
 
 ### Changed
 
+- Tutorials 40, 41 and 42 are one notebook, `40_DA_washout_free_ESN.ipynb`, in three parts: the Lorenz-63
+  system, partial observations of the same system, and the ten-site Lorenz-96 system.
+- The documentation has a Publications section, after the tutorials: the works produced with romda (the list of the
+  README) and the replication pages of CMAME 2023 and ICCS 2025, which leave the tutorial folders. The old addresses
+  redirect to the new pages.
+- Tutorials 43–46 of topic 4 are renumbered 41–44, so the numbers have no gap after the merge of 40–42:
+  `41_DA_parameter_estimation`, `42_DA_POD_ESN_cylinder`, `43_DA_CAE_ESN_KS` and `44_DA_CAE_ESN_Kolmogorov`. The
+  old addresses of the documentation redirect to the new pages.
 - `ESN_model` and the store of trained networks work with the echostatenetwork whose readout is
   $\mathbf{W}_\mathrm{out}^T \mathbf{r} + \mathbf{w}_0$ (the intercept outside `Wout`) and with the releases up
   to 0.6.0, whose `Wout` holds the constant in its last row. The store keeps one layout, `[Wout; constant row]`,
