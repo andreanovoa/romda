@@ -53,6 +53,10 @@ experiments from the command line: [`lorenz/`](../scripts/examples/lorenz/README
 
 ### Real-time data assimilation on reduced-order models [4x]
 
+* [x] 40 - Data assimilation in the reservoir: an ESN deployed with an ensemble filter and no washout, Lorenz63
+* [x] 41 - Washout-free deployment on the Lorenz96 ring (ten sites): inflation and sparse sensors
+* [x] 42 - Partial observations: partial-input and full-input ESNs, washout, substitution and filter
+* [x] 43 - State and parameter estimation with a parametric ESN, Lorenz63 with an unknown Rayleigh number
 * [x] 44 - Real-time DA on the POD-ESN cylinder-wake model ([Nóvoa & Magri 2025](https://doi.org/10.1007/978-3-031-97567-7_5))
 * [x] 45 - Real-time DA with the convolutional autoencoder echo state network (CAE-ESN) on the Kuramoto–Sivashinsky equation ([Özalp, Nóvoa & Magri 2026](https://doi.org/10.1016/j.cma.2025.118600))
 * [x] 46 - Real-time DA with the CAE-ESN on the Kolmogorov flow (the record, computed with jax-cfd, is not distributed)

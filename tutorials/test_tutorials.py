@@ -14,6 +14,8 @@ These tests are not part of the main suite (`pytest` collects `tests/` only): in
 explicitly. Notebooks 22, 31, 35 and 44 download datasets from Zenodo on first run; 45 integrates
 the Kuramoto-Sivashinsky equation and needs torch; 46 needs torch and the Kolmogorov record
 (jax-cfd, not distributed) in $DATA_ROOT/Kolmogorov/jax-cfd/.
+Notebooks 40 to 43 train their echo state networks on the first run (43: about two minutes) and keep them in the
+ESN store (results/esn_configs).
 
 To execute a single notebook in place:
 

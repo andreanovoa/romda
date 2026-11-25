@@ -50,6 +50,10 @@ Select a topic to list its notebooks.
 
     | Notebook | Contents |
     | --- | --- |
+    | [Washout-free ESN, Lorenz 63](tutorials/4_Real-time_DA_ROMs/40_DA_ESN_Lorenz63.md) | An ensemble filter on the input and the reservoir deploys an ESN from sparse and noisy data, with no washout; comparison with the substitution of the data. |
+    | [Washout-free ESN, Lorenz 96](tutorials/4_Real-time_DA_ROMs/41_DA_ESN_Lorenz96.md) | The deployment on the ten-site Lorenz-96 system: innovation-based inflation and sparse sensors. |
+    | [Washout-free ESN, partial observations](tutorials/4_Real-time_DA_ROMs/42_DA_partial_observations.md) | A component that is never measured: partial-input and full-input networks with a washout, the substitution and the filter. |
+    | [Parametric ESN, state and parameter estimation](tutorials/4_Real-time_DA_ROMs/43_DA_parameter_estimation.md) | A parametric ESN and the filter estimate the Rayleigh number of the Lorenz-63 system with the state. |
     | [Real-time DA with POD-ESN](tutorials/4_Real-time_DA_ROMs/44_DA_POD_ESN_cylinder.md) | Assimilating sparse sensors into the POD-ESN wake model.* |
     | [Real-time DA with CAE-ESN, Kuramoto–Sivashinsky](tutorials/4_Real-time_DA_ROMs/45_DA_CAE_ESN_KS.md) | A one-dimensional convolutional autoencoder and an echo state network (`CAE1D_ESN`) as the forecast model of an ensemble filter on the Kuramoto–Sivashinsky equation. Runs end to end; needs the `torch` extra. |
     | [Real-time DA with CAE-ESN, Kolmogorov flow](tutorials/4_Real-time_DA_ROMs/46_DA_CAE_ESN_Kolmogorov.md) | The multi-scale CAE-ESN (`MultiScaleCAE_ESN`) on the vorticity of the two-dimensional Kolmogorov flow. Needs the `torch` extra and a jax-cfd record of the flow, which is not distributed. |
